@@ -287,6 +287,10 @@ export function centerRouter(): Router {
  */
 export function statusHookRouter(): Router {
   const router = Router();
+  // Trello checks the callback URL with a HEAD request before creating the webhook.
+  router.head('/:integrationId/:token', (_req, res) => {
+    res.status(200).end();
+  });
   router.post('/:integrationId/:token', express.text({ type: '*/*', limit: '2mb' }), async (req, res) => {
     const integration = one<IntegrationRow & { hook_token: string | null }>('SELECT * FROM integrations WHERE id = ?', req.params.integrationId);
     const given = Buffer.from(req.params.token);
@@ -295,8 +299,12 @@ export function statusHookRouter(): Router {
       throw new HttpError(404, 'Unknown hook');
     }
     const body = typeof req.body === 'string' ? req.body : '';
+    run('UPDATE integrations SET last_hook_at = ? WHERE id = ?', new Date().toISOString(), integration.id);
+    // Asana's handshake: echo the secret it sends on the first call.
+    const asanaSecret = req.headers['x-hook-secret'];
+    if (typeof asanaSecret === 'string') res.setHeader('X-Hook-Secret', asanaSecret);
     // Answer right away: webhook senders time out quickly; the sync continues in the background.
-    res.status(202).json({ accepted: true });
+    res.status(typeof asanaSecret === 'string' ? 200 : 202).json({ accepted: true });
     void syncForIntegration(integration.id, body).catch((e) => console.warn('[hook]', e));
   });
   return router;

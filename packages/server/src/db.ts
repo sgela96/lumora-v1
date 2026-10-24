@@ -142,6 +142,20 @@ const MIGRATIONS: Migration[] = [
       }
     }
   },
+  // Onboarding: install detection, first report, per-account onboarding state, password reset,
+  // status-webhook health.
+  /* sql */ `
+  ALTER TABLE projects ADD COLUMN installed_at TEXT;
+  ALTER TABLE projects ADD COLUMN installed_origin TEXT;
+  ALTER TABLE projects ADD COLUMN first_report_at TEXT;
+  ALTER TABLE accounts ADD COLUMN onboarding TEXT NOT NULL DEFAULT '{}';
+  ALTER TABLE users ADD COLUMN reset_token_hash TEXT;
+  ALTER TABLE users ADD COLUMN reset_expires_at TEXT;
+  ALTER TABLE integrations ADD COLUMN last_hook_at TEXT;
+  ALTER TABLE integrations ADD COLUMN remote_hook_id TEXT;
+  UPDATE projects SET first_report_at = (SELECT MIN(created_at) FROM tickets t WHERE t.project_id = projects.id);
+  UPDATE accounts SET onboarding = '{"setupDone":true,"tourDone":true}';
+  `,
 ];
 
 export function getDb(): DatabaseSync {

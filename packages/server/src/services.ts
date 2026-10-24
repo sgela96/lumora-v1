@@ -15,7 +15,7 @@ import {
 } from '@lumora/shared';
 import { billingEnabled, config } from './config';
 import { getConnector } from './connectors';
-import type { LocalFile } from './connectors/types';
+import type { Connector, LocalFile } from './connectors/types';
 import { all, one, run, transaction } from './db';
 import { improveReport, type AiResult } from './lib/ai';
 import { decrypt, encrypt, id, signFileUrl } from './lib/crypto';
@@ -35,6 +35,8 @@ export interface AccountRow {
   stripe_subscription_id: string | null;
   /** JSON AddonQuantities, e.g. {"ai":1,"extra_app":2} */
   addons: string;
+  /** JSON OnboardingState */
+  onboarding: string;
   created_at: string;
 }
 
@@ -105,6 +107,9 @@ export interface ProjectRow {
   settings: string;
   ticket_prefix: string;
   ticket_counter: number;
+  installed_at: string | null;
+  installed_origin: string | null;
+  first_report_at: string | null;
   created_at: string;
 }
 
@@ -150,6 +155,9 @@ export function serializeProject(project: ProjectRow) {
     allowedOrigins: allowedOrigins(project),
     ticketPrefix: project.ticket_prefix,
     settings: projectSettings(project),
+    installedAt: project.installed_at,
+    installedOrigin: project.installed_origin,
+    firstReportAt: project.first_report_at,
     createdAt: project.created_at,
   };
 }
@@ -172,6 +180,8 @@ export interface IntegrationRow {
   enabled: number;
   /** Secret part of the inbound status webhook URL. */
   hook_token: string | null;
+  last_hook_at: string | null;
+  remote_hook_id: string | null;
   created_at: string;
 }
 
@@ -193,9 +203,38 @@ export function serializeIntegration(row: IntegrationRow) {
     categories: JSON.parse(row.categories) as string[],
     config: visible,
     syncsStatus: typeof connector?.fetchStatus === 'function',
+    autoHook: typeof (connector as HookCapable | undefined)?.registerStatusWebhook === 'function',
+    hookConfigured: !!row.remote_hook_id,
+    lastHookAt: row.last_hook_at,
+    webhookGuide: (connector as HookCapable | undefined)?.webhookGuide ?? [],
     hookUrl: connector?.fetchStatus && row.hook_token ? `${config.publicUrl}/api/hooks/status/${row.id}/${row.hook_token}` : null,
     createdAt: row.created_at,
   };
+}
+
+/** Optional connector capabilities for creating the status webhook in the remote tool. */
+export type HookCapable = Pick<Connector, 'registerStatusWebhook' | 'unregisterStatusWebhook' | 'webhookGuide'>;
+
+export interface OnboardingState {
+  setupDone?: boolean;
+  tourDone?: boolean;
+  /** Plan key the user already saw the "welcome to your plan" moment for. */
+  seenPlan?: string;
+}
+
+export function accountOnboarding(account: AccountRow): OnboardingState {
+  try {
+    return JSON.parse(account.onboarding || '{}') as OnboardingState;
+  } catch {
+    return {};
+  }
+}
+
+/** Changes when the plan, its paid status or the extras change — drives the "welcome to your plan" modal. */
+export function planKey(account: AccountRow): string {
+  const addons = accountAddons(account);
+  const sorted = Object.keys(addons).sort().map((k) => `${k}:${addons[k as keyof typeof addons]}`).join(',');
+  return `${accountPlan(account)}|${account.plan_status === 'trialing' ? 'trial' : 'paid'}|${sorted}`;
 }
 
 export function sealConfig(cfg: Record<string, string>): string {
@@ -251,6 +290,7 @@ export async function createTicket(
   const { reference } = transaction(() => {
     run('UPDATE projects SET ticket_counter = ticket_counter + 1 WHERE id = ?', project.id);
     const counter = one<{ ticket_counter: number }>('SELECT ticket_counter FROM projects WHERE id = ?', project.id)!.ticket_counter;
+    run("UPDATE projects SET first_report_at = COALESCE(first_report_at, datetime('now')) WHERE id = ?", project.id);
     run(
       `INSERT INTO usage (account_id, month, reports) VALUES (?, ?, 1)
        ON CONFLICT(account_id, month) DO UPDATE SET reports = reports + 1`,

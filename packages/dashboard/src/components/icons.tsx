@@ -96,6 +96,17 @@ export const Icons = {
       <path d="M12 8v5M12 16h.01" />
     </Icon>
   ),
+  help: (p: P) => (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.3M12 17h.01" />
+    </Icon>
+  ),
+  sparkle: (p: P) => (
+    <Icon {...p}>
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
+    </Icon>
+  ),
 };
 
 /** Monogram tiles for integrations — neutral, consistent, no third-party logos. */

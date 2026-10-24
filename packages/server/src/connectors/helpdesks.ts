@@ -16,6 +16,32 @@ export const jira: Connector = {
     { key: 'issueType', label: 'Issue type', type: 'text', required: false, placeholder: 'Bug' },
     { key: 'labels', label: 'Labels (comma separated)', type: 'text', required: false, placeholder: 'lumora, customer-report' },
   ],
+  async registerStatusWebhook(cfg, url) {
+    required(cfg, 'siteUrl', 'email', 'apiToken', 'projectKey');
+    const base = normalizeBaseUrl(cfg.siteUrl);
+    const hook = await request<{ self: string }>(`${base}/rest/webhooks/1.0/webhook`, {
+      method: 'POST',
+      headers: { Authorization: basicAuth(cfg.email, cfg.apiToken), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        name: 'Lumora status sync',
+        url,
+        events: ['jira:issue_updated'],
+        filters: { 'issue-related-events-section': `project = "${cfg.projectKey}"` },
+        excludeBody: false,
+      }),
+    });
+    return { id: hook.self.split('/').pop()!, note: 'Webhook created in Jira (needs a Jira admin account).' };
+  },
+  async unregisterStatusWebhook(cfg, id) {
+    await request(`${normalizeBaseUrl(cfg.siteUrl)}/rest/webhooks/1.0/webhook/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { Authorization: basicAuth(cfg.email, cfg.apiToken) },
+    });
+  },
+  webhookGuide: [
+    'Jira → Settings (⚙) → System → WebHooks → Create a WebHook (Jira admins only).',
+    'Paste the URL below, tick Issue → updated, and optionally limit it with the JQL: project = YOURKEY.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'siteUrl', 'email', 'apiToken', 'projectKey');
     const base = normalizeBaseUrl(cfg.siteUrl);
@@ -78,6 +104,11 @@ export const zendesk: Connector = {
     { key: 'email', label: 'Agent e-mail', type: 'email', required: true },
     { key: 'apiToken', label: 'API token', type: 'password', required: true, help: 'Admin Center → Apps and integrations → Zendesk API' },
     { key: 'tags', label: 'Tags (comma separated)', type: 'text', required: false, placeholder: 'lumora' },
+  ],
+  webhookGuide: [
+    'Admin Center → Apps and integrations → Webhooks → Create webhook → Trigger or automation.',
+    'Paste the URL below as the endpoint, method POST, format JSON.',
+    'Admin Center → Objects and rules → Triggers → Add trigger: “Ticket is updated” and tag contains lumora → Notify webhook with body {"ticket": "{{ticket.id}}"}.',
   ],
   async send(ctx, cfg) {
     required(cfg, 'subdomain', 'email', 'apiToken');
@@ -149,6 +180,10 @@ export const freshdesk: Connector = {
     { key: 'apiKey', label: 'API key', type: 'password', required: true, help: 'Profile settings → Your API Key' },
     { key: 'fallbackEmail', label: 'Requester e-mail for anonymous reports', type: 'email', required: true, placeholder: 'reports@yourcompany.com' },
   ],
+  webhookGuide: [
+    'Admin → Workflows → Automations → Ticket updates → New rule.',
+    'Condition: “Status is changed”; action: Trigger webhook, POST, the URL below, content {"ticket": "{{ticket.id}}"}.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'domain', 'apiKey', 'fallbackEmail');
     const base = normalizeBaseUrl(cfg.domain);
@@ -204,6 +239,23 @@ export const github: Connector = {
     { key: 'repository', label: 'Repository', type: 'text', required: true, placeholder: 'owner/repo' },
     { key: 'token', label: 'Fine-grained token', type: 'password', required: true, help: 'Needs “Issues: read and write” on the repository.' },
     { key: 'labels', label: 'Labels (comma separated)', type: 'text', required: false, placeholder: 'bug, from-users' },
+  ],
+  async registerStatusWebhook(cfg, url) {
+    required(cfg, 'repository', 'token');
+    const hook = await request<{ id: number }>(`https://api.github.com/repos/${repoPath(cfg.repository)}/hooks`, {
+      method: 'POST',
+      headers: githubHeaders(cfg.token),
+      body: JSON.stringify({ name: 'web', active: true, events: ['issues'], config: { url, content_type: 'json' } }),
+    });
+    return { id: String(hook.id) };
+  },
+  async unregisterStatusWebhook(cfg, id) {
+    await request(`https://api.github.com/repos/${repoPath(cfg.repository)}/hooks/${encodeURIComponent(id)}`, { method: 'DELETE', headers: githubHeaders(cfg.token) });
+  },
+  webhookGuide: [
+    'Repository → Settings → Webhooks → Add webhook.',
+    'Paste the URL below as Payload URL, content type application/json.',
+    'Choose “Let me select individual events” → Issues, then Add webhook.',
   ],
   async send(ctx, cfg) {
     required(cfg, 'repository', 'token');
@@ -269,6 +321,10 @@ export const linear: Connector = {
     { key: 'apiKey', label: 'API key', type: 'password', required: true, help: 'Settings → Account → Security & access → Personal API keys' },
     { key: 'teamKey', label: 'Team key', type: 'text', required: true, placeholder: 'ENG' },
   ],
+  webhookGuide: [
+    'Linear → Settings → API → Webhooks → New webhook (workspace admins).',
+    'Paste the URL below, pick your team and the “Issues” data change event.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'apiKey', 'teamKey');
     const teamId = await linearTeamId(cfg);
@@ -330,6 +386,10 @@ export const salesforce: Connector = {
     { key: 'clientSecret', label: 'Consumer secret', type: 'password', required: true, help: 'Enable “Client Credentials Flow” and set a Run As user on the app.' },
     { key: 'origin', label: 'Case origin', type: 'text', required: false, placeholder: 'Web' },
     { key: 'priority', label: 'Case priority', type: 'text', required: false, placeholder: 'Medium' },
+  ],
+  webhookGuide: [
+    'Salesforce updates arrive through regular status checks every few minutes — no setup needed.',
+    'For instant updates, an admin can add a Flow on Case update with an HTTP Callout (POST) to the URL below.',
   ],
   async send(ctx, cfg) {
     const { base, token } = await salesforceToken(cfg);

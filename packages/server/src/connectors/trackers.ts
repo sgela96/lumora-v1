@@ -52,6 +52,10 @@ export const azureDevops: Connector = {
     { key: 'workItemType', label: 'Work item type', type: 'text', required: false, placeholder: 'Bug' },
     { key: 'tags', label: 'Tags (comma separated)', type: 'text', required: false, placeholder: 'lumora; customer-report' },
   ],
+  webhookGuide: [
+    'Project settings → Service hooks → Create subscription → Web Hooks.',
+    'Trigger: “Work item updated” (filter by tag lumora if you like), then paste the URL below and finish.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'organization', 'project', 'token');
     const base = adoBase(cfg);
@@ -120,6 +124,21 @@ export const gitlab: Connector = {
     { key: 'token', label: 'Access token', type: 'password', required: true, help: 'Project or personal token with the “api” scope.' },
     { key: 'labels', label: 'Labels (comma separated)', type: 'text', required: false, placeholder: 'bug, from-users' },
   ],
+  async registerStatusWebhook(cfg, url) {
+    required(cfg, 'project', 'token');
+    const { api, project } = gitlabProject(cfg);
+    const hook = await request<{ id: number }>(`${api}/projects/${project}/hooks`, {
+      method: 'POST',
+      headers: { 'PRIVATE-TOKEN': cfg.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, issues_events: true, push_events: false, enable_ssl_verification: true }),
+    });
+    return { id: String(hook.id), note: 'Webhook created in GitLab (needs Maintainer access).' };
+  },
+  async unregisterStatusWebhook(cfg, id) {
+    const { api, project } = gitlabProject(cfg);
+    await request(`${api}/projects/${project}/hooks/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'PRIVATE-TOKEN': cfg.token } });
+  },
+  webhookGuide: ['Project → Settings → Webhooks → Add new webhook.', 'Paste the URL below, tick “Issues events” and save.'],
   async send(ctx, cfg) {
     required(cfg, 'project', 'token');
     const { api, project } = gitlabProject(cfg);
@@ -166,6 +185,10 @@ export const clickup: Connector = {
     { key: 'token', label: 'API token', type: 'password', required: true, help: 'Settings → Apps → API Token (starts with pk_).' },
     { key: 'listId', label: 'List ID', type: 'text', required: true, help: 'The number at the end of the list URL.' },
   ],
+  webhookGuide: [
+    'ClickUp → Settings → Integrations → Webhooks (or Automations → “When status changes” → Call webhook).',
+    'Paste the URL below and choose the taskStatusUpdated event.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'token', 'listId');
     const task = await request<{ id: string; url: string; custom_id?: string | null }>(
@@ -210,6 +233,18 @@ export const asana: Connector = {
     { key: 'token', label: 'Personal access token', type: 'password', required: true, help: 'My settings → Apps → Developer apps.' },
     { key: 'projectId', label: 'Project ID', type: 'text', required: true, help: 'The number in the project URL.' },
   ],
+  async registerStatusWebhook(cfg, url) {
+    required(cfg, 'token', 'projectId');
+    const hook = await request<{ data: { gid: string } }>(`${ASANA}/webhooks`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { resource: cfg.projectId, target: url, filters: [{ resource_type: 'task', action: 'changed', fields: ['completed'] }] } }),
+    });
+    return { id: hook.data.gid };
+  },
+  async unregisterStatusWebhook(cfg, id) {
+    await request(`${ASANA}/webhooks/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${cfg.token}` } });
+  },
   async send(ctx, cfg) {
     required(cfg, 'token', 'projectId');
     const headers = { Authorization: `Bearer ${cfg.token}` };
@@ -260,6 +295,7 @@ export const shortcut: Connector = {
       help: 'The state new bugs should start in (Settings → Workflows → click a state; the ID is in the URL).',
     },
   ],
+  webhookGuide: ['Shortcut → Settings → Integrations → Webhooks → Add new webhook.', 'Paste the URL below and save.'],
   async send(ctx, cfg) {
     required(cfg, 'token', 'workflowStateId');
     const story = await request<{ id: number; app_url: string }>(`${SHORTCUT}/stories`, {
@@ -311,6 +347,10 @@ export const youtrack: Connector = {
     { key: 'baseUrl', label: 'YouTrack URL', type: 'url', required: true, placeholder: 'https://yourcompany.youtrack.cloud' },
     { key: 'token', label: 'Permanent token', type: 'password', required: true, help: 'Profile → Account security → Tokens.' },
     { key: 'project', label: 'Project short name', type: 'text', required: true, placeholder: 'SUP' },
+  ],
+  webhookGuide: [
+    'YouTrack updates arrive through regular status checks every few minutes.',
+    'For instant updates, add a workflow rule “on change of State” that POSTs to the URL below.',
   ],
   async send(ctx, cfg) {
     required(cfg, 'baseUrl', 'token', 'project');
@@ -374,6 +414,20 @@ export const trello: Connector = {
     { key: 'token', label: 'Token', type: 'password', required: true },
     { key: 'listId', label: 'List ID', type: 'text', required: true, help: 'Add .json to a card URL in that list and look for idList.' },
   ],
+  async registerStatusWebhook(cfg, url) {
+    required(cfg, 'apiKey', 'token', 'listId');
+    // Watch the whole board, so moving a card to another list counts as a status change.
+    const list = await request<{ idBoard: string }>(`${TRELLO}/lists/${encodeURIComponent(cfg.listId)}?fields=idBoard&${trelloAuth(cfg)}`);
+    const hook = await request<{ id: string }>(`${TRELLO}/webhooks?${trelloAuth(cfg)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callbackURL: url, idModel: list.idBoard, description: 'Lumora status sync' }),
+    });
+    return { id: hook.id };
+  },
+  async unregisterStatusWebhook(cfg, id) {
+    await request(`${TRELLO}/webhooks/${encodeURIComponent(id)}?${trelloAuth(cfg)}`, { method: 'DELETE' });
+  },
   async send(ctx, cfg) {
     required(cfg, 'apiKey', 'token', 'listId');
     const card = await request<{ id: string; shortUrl: string; idShort: number }>(`${TRELLO}/cards?${trelloAuth(cfg)}`, {

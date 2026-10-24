@@ -27,13 +27,16 @@ export interface Me {
     chosenPlan: PlanId;
     addons: AddonQuantities;
     planStatus: string;
+    /** Changes with plan / paid status / extras — drives the "welcome to your plan" modal. */
+    planKey: string;
+    onboarding: { setupDone?: boolean; tourDone?: boolean; seenPlan?: string };
     trialEndsAt: string | null;
     active: boolean;
     hasBillingCustomer: boolean;
   };
   limits: PlanLimits;
   usage: { month: string; reports: number; aiReports: number };
-  server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; transcriptionAvailable: boolean; emailAvailable: boolean };
+  server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; transcriptionAvailable: boolean; emailAvailable: boolean; supportEmail: string };
 }
 
 export interface ConnectorInfo {
@@ -63,7 +66,11 @@ export interface Project {
   settings: ProjectSettings;
   createdAt: string;
   tickets?: number;
+  destinations?: number;
   lastTicketAt?: string | null;
+  installedAt: string | null;
+  installedOrigin: string | null;
+  firstReportAt: string | null;
 }
 
 export interface Integration {
@@ -75,6 +82,10 @@ export interface Integration {
   config: Record<string, string>;
   syncsStatus: boolean;
   hookUrl: string | null;
+  autoHook: boolean;
+  hookConfigured: boolean;
+  lastHookAt: string | null;
+  webhookGuide: string[];
   createdAt: string;
 }
 

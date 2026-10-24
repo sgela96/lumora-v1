@@ -250,3 +250,92 @@ test('Pro extras unlock help desks; an expired trial falls back to Free', async 
   const cfg = await fetch(`${base}/api/widget/config?key=${project.publicKey}`).then((r) => r.json());
   assert.equal(cfg.plan, 'free');
 });
+
+test('onboarding: install detection, first report, progress and the plan the user has seen', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Lu', company: 'Hooli', email: 'lu@hooli.test', password: 'password123' } });
+  let me = (await call('/api/me')).body;
+  assert.equal(me.account.onboarding.setupDone, undefined);
+  assert.equal(me.account.onboarding.seenPlan, me.account.planKey, 'the trial itself is not a "payment" moment');
+
+  const [project] = (await call('/api/projects')).body;
+  assert.equal(project.installedAt, null);
+  await fetch(`${base}/api/widget/config?key=${project.publicKey}`, { headers: { Origin: 'https://app.hooli.test' } });
+  await report(project.publicKey, { kind: 'screenshot', fields: { description: 'Hello' } }, 'https://app.hooli.test');
+  const [after] = (await call('/api/projects')).body;
+  assert.equal(after.installedOrigin, 'https://app.hooli.test');
+  assert.ok(!Number.isNaN(Date.parse(after.installedAt)));
+  assert.ok(after.firstReportAt);
+
+  assert.equal((await call('/api/me/onboarding', { method: 'PATCH', body: { setupDone: true, tourDone: true } })).status, 200);
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
+  me = (await call('/api/me')).body;
+  assert.deepEqual([me.account.onboarding.setupDone, me.account.onboarding.tourDone], [true, true]);
+  assert.notEqual(me.account.planKey, me.account.onboarding.seenPlan, 'a new plan is waiting to be celebrated');
+  await call('/api/me/onboarding', { method: 'PATCH', body: { seenPlan: true } });
+  me = (await call('/api/me')).body;
+  assert.equal(me.account.planKey, me.account.onboarding.seenPlan);
+});
+
+test('password reset: unknown e-mails look the same, tokens are single-use', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Ro', company: 'Umbrella', email: 'ro@umbrella.test', password: 'password123' } });
+  cookie = '';
+  assert.deepEqual((await call('/api/auth/forgot', { body: { email: 'nobody@umbrella.test' } })).body, { ok: true });
+  assert.deepEqual((await call('/api/auth/forgot', { body: { email: 'ro@umbrella.test' } })).body, { ok: true });
+
+  // The real token is only e-mailed; plant a known one.
+  const { createHash } = await import('node:crypto');
+  const { getDb } = await import('../src/db');
+  const token = 'known-reset-token';
+  getDb()
+    .prepare('UPDATE users SET reset_token_hash = ?, reset_expires_at = ? WHERE email = ?')
+    .run(createHash('sha256').update(token).digest('hex'), new Date(Date.now() + 60_000).toISOString(), 'ro@umbrella.test');
+
+  assert.equal((await call('/api/auth/reset', { body: { token, password: 'short' } })).status, 400);
+  assert.equal((await call('/api/auth/reset', { body: { token, password: 'new-password-1' } })).status, 200);
+  assert.equal((await call('/api/me')).status, 200, 'signed in after reset');
+  assert.equal((await call('/api/auth/reset', { body: { token, password: 'new-password-2' } })).status, 400);
+  cookie = '';
+  assert.equal((await call('/api/auth/login', { body: { email: 'ro@umbrella.test', password: 'new-password-1' } })).status, 200);
+});
+
+test('status webhook is created in GitHub with one click and removed with the integration', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Gi', company: 'Stark', email: 'gi@stark.test', password: 'password123' } });
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
+  const [project] = (await call('/api/projects')).body;
+  const calls: { method: string; url: string; body?: string }[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (!url.startsWith('https://api.github.com')) return realFetch(input, init);
+    calls.push({ method: init?.method ?? 'GET', url, body: init?.body as string });
+    if (url.endsWith('/hooks') && init?.method === 'POST') return Response.json({ id: 77 }, { status: 201 });
+    if (init?.method === 'DELETE') return new Response(null, { status: 204 });
+    return Response.json({ full_name: 'stark/suit', has_issues: true });
+  }) as typeof fetch;
+  try {
+    const created = (await call(`/api/projects/${project.id}/integrations`, { body: { type: 'github', config: { repository: 'stark/suit', token: 'ghp_x' } } })).body;
+    assert.equal(created.autoHook, true);
+    assert.equal(created.hookConfigured, false);
+    assert.ok(created.webhookGuide.length > 0);
+
+    const hook = (await call(`/api/integrations/${created.id}/auto-hook`, { body: {} })).body;
+    assert.equal(hook.ok, true);
+    const post = calls.find((c) => c.url.endsWith('/repos/stark/suit/hooks'))!;
+    assert.equal(JSON.parse(post.body!).config.url, created.hookUrl);
+    const [listed] = (await call(`/api/projects/${project.id}/integrations`)).body;
+    assert.equal(listed.hookConfigured, true);
+
+    // The hook URL answers and records when the last update arrived.
+    const ping = await fetch(base + new URL(created.hookUrl).pathname, { method: 'POST', body: '{"zen":"hi"}', headers: { 'Content-Type': 'application/json' } });
+    assert.equal(ping.status, 202);
+    assert.ok((await call(`/api/projects/${project.id}/integrations`)).body[0].lastHookAt);
+
+    assert.equal((await call(`/api/integrations/${created.id}`, { method: 'DELETE', body: {} })).status, 200);
+    assert.ok(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/repos/stark/suit/hooks/77')));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
