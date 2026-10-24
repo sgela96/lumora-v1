@@ -9,6 +9,7 @@ import {
   type PlanId,
   type ProjectSettings,
   type ReportPayload,
+  type TicketStatus,
 } from '@lumora/shared';
 import { billingEnabled, config } from './config';
 import { getConnector } from './connectors';
@@ -16,6 +17,7 @@ import type { LocalFile } from './connectors/types';
 import { all, one, run, transaction } from './db';
 import { improveReport } from './lib/ai';
 import { decrypt, encrypt, id, signFileUrl } from './lib/crypto';
+import { issueSignature, normalizePath, pathOf } from './lib/signature';
 import { renderTicket, stepsFor, ticketLocale, type Attachment } from './lib/ticket';
 
 // ---------------------------------------------------------------- Accounts & plans
@@ -133,6 +135,8 @@ export interface IntegrationRow {
   config_enc: string;
   categories: string;
   enabled: number;
+  /** Secret part of the inbound status webhook URL. */
+  hook_token: string | null;
   created_at: string;
 }
 
@@ -153,6 +157,8 @@ export function serializeIntegration(row: IntegrationRow) {
     enabled: !!row.enabled,
     categories: JSON.parse(row.categories) as string[],
     config: visible,
+    syncsStatus: typeof connector?.fetchStatus === 'function',
+    hookUrl: connector?.fetchStatus && row.hook_token ? `${config.publicUrl}/api/hooks/status/${row.id}/${row.hook_token}` : null,
     createdAt: row.created_at,
   };
 }
@@ -180,9 +186,12 @@ export interface Delivery {
   name: string;
   status: 'pending' | 'sent' | 'failed';
   externalId?: string;
+  displayId?: string;
   url?: string;
   error?: string;
   at: string;
+  /** Last status read from the linked ticket (Support Center). */
+  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string };
 }
 
 export function uploadsDir(): string {
@@ -238,9 +247,11 @@ export async function createTicket(
 
   const { steps, relative } = stepsFor(payload, settings);
   const rendered = renderTicket({ settings, payload, steps, stepsAreRelative: relative, attachments, reference });
+  const signature = issueSignature(payload, rendered.category);
   run(
-    `INSERT INTO tickets (id, project_id, reference, kind, title, description, category, reporter_email, payload, steps, screenshot_file, recording_file)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tickets (id, project_id, reference, kind, title, description, category, reporter_email, payload, steps, screenshot_file, recording_file,
+                          fingerprint, issue_label, page_path, browser, os, error_count, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
     ticketId,
     project.id,
     reference,
@@ -253,6 +264,12 @@ export async function createTicket(
     JSON.stringify(steps),
     stored.screenshot?.name ?? null,
     stored.recording?.name ?? null,
+    signature.fingerprint,
+    signature.label,
+    payload.environment?.url ? normalizePath(pathOf(payload.environment.url)) : null,
+    payload.environment?.browser ?? null,
+    payload.environment?.os ?? null,
+    payload.console?.filter((e) => e.level === 'error').length ?? 0,
   );
 
   // The user gets their reference right away; AI and forwarding happen in the background.
@@ -304,7 +321,19 @@ export interface TicketRow {
   screenshot_file: string | null;
   recording_file: string | null;
   deliveries: string;
+  /** open | in_progress | resolved — synced from the linked ticket when there is one. */
   status: string;
+  /** pending | sent | failed | none */
+  delivery_status: string;
+  external_status: string | null;
+  fingerprint: string | null;
+  issue_label: string | null;
+  page_path: string | null;
+  browser: string | null;
+  os: string | null;
+  error_count: number;
+  synced_at: string | null;
+  resolved_at: string | null;
   created_at: string;
 }
 
@@ -363,18 +392,19 @@ export async function deliverTicket(ticketId: string, onlyIntegrationId?: string
           aiSummary: ticket.ai_summary ?? undefined,
           files,
           attachments,
-          dashboardUrl: `${config.publicUrl}/app/#/projects/${project.id}/tickets/${ticket.id}`,
+          dashboardUrl: `${config.publicUrl}/app/#/p/${project.id}/reports/${ticket.id}`,
         },
         integrationConfig(integration),
       );
       results.push({ ...base, status: 'sent', ...result });
+      if (result.externalId) results[results.length - 1].external = { status: 'open', label: 'Created', syncedAt: base.at };
     } catch (error) {
       results.push({ ...base, status: 'failed', error: error instanceof Error ? error.message : String(error) });
     }
   }
   const deliveries = [...previous, ...results];
-  const status = results.some((r) => r.status === 'failed') ? 'delivery_failed' : results.length ? 'forwarded' : ticket.status;
-  run('UPDATE tickets SET deliveries = ?, status = ? WHERE id = ?', JSON.stringify(deliveries), status, ticket.id);
+  const deliveryStatus = !deliveries.length ? 'none' : deliveries.some((d) => d.status === 'failed') ? 'failed' : 'sent';
+  run('UPDATE tickets SET deliveries = ?, delivery_status = ? WHERE id = ?', JSON.stringify(deliveries), deliveryStatus, ticket.id);
   return deliveries;
 }
 
@@ -386,7 +416,16 @@ export function serializeTicket(row: TicketRow, full = false) {
     title: row.title,
     category: row.category,
     reporterEmail: row.reporter_email,
-    status: row.status,
+    status: row.status as TicketStatus,
+    deliveryStatus: row.delivery_status,
+    externalStatus: row.external_status,
+    syncedAt: row.synced_at,
+    resolvedAt: row.resolved_at,
+    issue: row.fingerprint ? { fingerprint: row.fingerprint, label: row.issue_label ?? '' } : null,
+    pagePath: row.page_path,
+    browser: row.browser,
+    os: row.os,
+    errorCount: row.error_count,
     deliveries: JSON.parse(row.deliveries) as Delivery[],
     hasScreenshot: !!row.screenshot_file,
     hasRecording: !!row.recording_file,

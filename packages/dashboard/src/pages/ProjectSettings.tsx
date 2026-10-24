@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, type Project } from '../api';
-import { Card, Field, PageHead, useToast } from '../components/ui';
+import { Card, Field, SectionIntro, useToast } from '../components/ui';
 import { navigate, useApp } from '../state';
 
 export function ProjectSettingsPage({ project }: { project: Project }) {
@@ -43,7 +43,7 @@ export function ProjectSettingsPage({ project }: { project: Project }) {
 
   return (
     <div className="stack">
-      <PageHead title="Site settings" subtitle={project.name} />
+      <SectionIntro>Name, allowed domains and the widget key for this app.</SectionIntro>
       <Card title="General">
         <div className="stack">
           <div className="grid-2">

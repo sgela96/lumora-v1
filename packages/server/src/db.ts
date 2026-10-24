@@ -1,13 +1,17 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { ReportPayload } from '@lumora/shared';
 import { config } from './config';
+import { issueSignature, normalizePath, pathOf } from './lib/signature';
 
 export type Row = Record<string, unknown>;
 
 let db: DatabaseSync | undefined;
 
-const MIGRATIONS = [
+type Migration = string | ((database: DatabaseSync) => void);
+
+const MIGRATIONS: Migration[] = [
   /* sql */ `
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
@@ -79,6 +83,43 @@ const MIGRATIONS = [
     PRIMARY KEY (account_id, month)
   );
   `,
+  // Support Center: workflow status separate from delivery, synced from linked tickets; issue grouping.
+  /* sql */ `
+  ALTER TABLE tickets ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'pending';
+  ALTER TABLE tickets ADD COLUMN external_status TEXT;
+  ALTER TABLE tickets ADD COLUMN fingerprint TEXT;
+  ALTER TABLE tickets ADD COLUMN issue_label TEXT;
+  ALTER TABLE tickets ADD COLUMN page_path TEXT;
+  ALTER TABLE tickets ADD COLUMN browser TEXT;
+  ALTER TABLE tickets ADD COLUMN os TEXT;
+  ALTER TABLE tickets ADD COLUMN error_count INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE tickets ADD COLUMN synced_at TEXT;
+  ALTER TABLE tickets ADD COLUMN resolved_at TEXT;
+  UPDATE tickets SET delivery_status = CASE status WHEN 'forwarded' THEN 'sent' WHEN 'delivery_failed' THEN 'failed' ELSE 'pending' END;
+  UPDATE tickets SET status = CASE status WHEN 'resolved' THEN 'resolved' ELSE 'open' END;
+  CREATE INDEX tickets_status ON tickets(project_id, status, created_at DESC);
+  CREATE INDEX tickets_fingerprint ON tickets(project_id, fingerprint);
+  ALTER TABLE integrations ADD COLUMN hook_token TEXT;
+  `,
+  (database) => {
+    // Backfill grouping and facets for reports created before the Support Center existed.
+    const rows = database.prepare('SELECT id, payload, category FROM tickets').all() as { id: string; payload: string; category: string | null }[];
+    const update = database.prepare('UPDATE tickets SET fingerprint = ?, issue_label = ?, page_path = ?, browser = ?, os = ?, error_count = ? WHERE id = ?');
+    for (const row of rows) {
+      const payload = JSON.parse(row.payload) as ReportPayload;
+      const sig = issueSignature(payload, row.category);
+      const env = payload.environment;
+      update.run(
+        sig.fingerprint,
+        sig.label,
+        env?.url ? normalizePath(pathOf(env.url)) : null,
+        env?.browser ?? null,
+        env?.os ?? null,
+        payload.console?.filter((e) => e.level === 'error').length ?? 0,
+        row.id,
+      );
+    }
+  },
 ];
 
 export function getDb(): DatabaseSync {
@@ -95,7 +136,9 @@ function migrate(database: DatabaseSync): void {
   for (let i = version; i < MIGRATIONS.length; i++) {
     database.exec('BEGIN');
     try {
-      database.exec(MIGRATIONS[i]);
+      const migration = MIGRATIONS[i];
+      if (typeof migration === 'string') database.exec(migration);
+      else migration(database);
       database.exec(`PRAGMA user_version = ${i + 1}`);
       database.exec('COMMIT');
     } catch (error) {

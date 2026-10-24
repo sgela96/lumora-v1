@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { LogLevel } from '@lumora/shared';
 import type { Project } from '../api';
-import { Card, Field, PageHead, SaveBar, ToggleRow, useToast } from '../components/ui';
+import { Card, Field, SaveBar, SectionIntro, ToggleRow, useToast } from '../components/ui';
 import { useApp, useFeatureLock, useSettingsDraft } from '../state';
 
 const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'log', 'debug'];
@@ -25,7 +25,7 @@ export function CapturePage({ project }: { project: Project }) {
 
   return (
     <div className="stack">
-      <PageHead title="Data capture" subtitle="Choose what technical context travels with each report. Users can see and switch off what’s included." />
+      <SectionIntro>What travels with every report. It’s attached automatically — people are told what’s included, never asked to collect it.</SectionIntro>
 
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <div className="stack">

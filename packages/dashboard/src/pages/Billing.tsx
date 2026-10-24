@@ -1,6 +1,7 @@
 import { PLAN_ORDER, type PlanId } from '@lumora/shared';
 import { useState } from 'react';
 import { api } from '../api';
+import { Icons } from '../components/icons';
 import { PageHead, useToast } from '../components/ui';
 import { useApp } from '../state';
 
@@ -76,7 +77,10 @@ export function BillingPage() {
               <p className="muted small">{plan.tagline}</p>
               <ul className="small">
                 {plan.highlights.map((h) => (
-                  <li key={h}>{h}</li>
+                  <li key={h}>
+                    <Icons.check size={15} />
+                    {h}
+                  </li>
                 ))}
               </ul>
               <div style={{ marginTop: 'auto' }}>

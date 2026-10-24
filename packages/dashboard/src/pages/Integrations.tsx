@@ -1,20 +1,11 @@
-import { minimumPlanForIntegration, PLANS } from '@lumora/shared';
+import { INTEGRATION_CATEGORIES, minimumPlanForIntegration, PLANS, type IntegrationCategory } from '@lumora/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type ConnectorInfo, type Integration, type Project } from '../api';
-import { Card, Field, PageHead, Switch, UpgradeBadge, useToast } from '../components/ui';
+import { Icons, LogoTile } from '../components/icons';
+import { Card, CopyButton, Field, SectionIntro, Switch, UpgradeBadge, useToast } from '../components/ui';
 import { navigate, useApp } from '../state';
 
-const LOGOS: Record<string, string> = {
-  webhook: '🪝',
-  slack: '💬',
-  email: '✉️',
-  jira: '🟦',
-  zendesk: '🟩',
-  freshdesk: '🟢',
-  github: '🐙',
-  linear: '🟪',
-  salesforce: '☁️',
-};
+const ORDER: IntegrationCategory[] = ['trackers', 'helpdesks', 'enterprise', 'messaging'];
 
 export function IntegrationsPage({ project }: { project: Project }) {
   const { me, catalog } = useApp();
@@ -30,6 +21,7 @@ export function IntegrationsPage({ project }: { project: Project }) {
   const categoryField = project.settings.template.fields.find((f) => f.id === 'category' && f.type === 'select');
   const active = items?.filter((i) => i.enabled).length ?? 0;
   const max = me.limits.destinationsPerProject;
+  const connectorOf = (type: string) => catalog.integrations.find((c) => c.type === type)!;
 
   const toggle = async (integration: Integration, enabled: boolean) => {
     try {
@@ -42,34 +34,40 @@ export function IntegrationsPage({ project }: { project: Project }) {
 
   const test = async (integration: Integration) => {
     const result = await api<{ ok: boolean; message: string }>(`/integrations/${integration.id}/test`, { body: {} });
-    toast(result.ok ? `✓ ${result.message}` : result.message, !result.ok);
+    toast(result.ok ? result.message : result.message, !result.ok);
   };
 
   const remove = async (integration: Integration) => {
-    if (!confirm(`Remove ${integration.name}? Reports will no longer be sent there.`)) return;
+    if (!confirm(`Remove ${integration.name}? New reports will no longer be sent there.`)) return;
     await api(`/integrations/${integration.id}`, { method: 'DELETE' });
     load();
   };
 
   return (
     <div className="stack">
-      <PageHead
-        title="Integrations"
-        subtitle={`Where reports go. ${active} of ${max} destination${max === 1 ? '' : 's'} in use on your plan.`}
-      />
+      <SectionIntro>
+        Where tickets are created, following your template. {active} of {max} destination{max === 1 ? '' : 's'} in use.
+      </SectionIntro>
 
-      {items && items.length > 0 && (
+      {items && items.length > 0 && !editing && (
         <Card title="Connected" pad={false}>
           <table className="table">
             <tbody>
               {items.map((i) => (
                 <tr key={i.id}>
-                  <td style={{ width: 40, fontSize: 22 }}>{LOGOS[i.type]}</td>
+                  <td style={{ width: 52, paddingRight: 0 }}>
+                    <LogoTile type={i.type} />
+                  </td>
                   <td>
                     <strong>{i.name}</strong>
-                    <div className="muted small">
-                      {catalog.integrations.find((c) => c.type === i.type)?.label}
-                      {i.categories.length > 0 && ` · only ${i.categories.join(', ')}`}
+                    <div className="muted small row" style={{ gap: 6 }}>
+                      {connectorOf(i.type)?.label}
+                      {i.syncsStatus && (
+                        <span className="badge" title="Ticket status is read back into Lumora">
+                          <Icons.sync size={11} /> Status sync{me.limits.features.supportCenter ? '' : ' · Business'}
+                        </span>
+                      )}
+                      {i.categories.length > 0 && <span>· only {i.categories.join(', ')}</span>}
                     </div>
                   </td>
                   <td style={{ textAlign: 'right' }}>
@@ -77,7 +75,7 @@ export function IntegrationsPage({ project }: { project: Project }) {
                       <button className="btn btn-sm" onClick={() => test(i)}>
                         Test
                       </button>
-                      <button className="btn btn-sm" onClick={() => setEditing({ connector: catalog.integrations.find((c) => c.type === i.type)!, integration: i })}>
+                      <button className="btn btn-sm" onClick={() => setEditing({ connector: connectorOf(i.type), integration: i })}>
                         Edit
                       </button>
                       <button className="btn btn-sm btn-ghost btn-danger" onClick={() => remove(i)}>
@@ -98,7 +96,8 @@ export function IntegrationsPage({ project }: { project: Project }) {
           project={project}
           connector={editing.connector}
           integration={editing.integration}
-          categories={me.limits.features.routingByCategory ? categoryField?.options ?? [] : []}
+          categories={me.limits.features.routingByCategory ? (categoryField?.options ?? []) : []}
+          showHook={me.limits.features.supportCenter}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -106,25 +105,29 @@ export function IntegrationsPage({ project }: { project: Project }) {
           }}
         />
       ) : (
-        <Card title="Add a destination">
-          <div className="grid-3">
-            {catalog.integrations.map((c) => {
-              const allowed = PLANS[me.account.plan].integrations.includes(c.type);
-              return (
-                <button key={c.type} className="card integration-tile" onClick={() => (allowed ? setEditing({ connector: c }) : navigate('/billing'))}>
-                  <div className="spread">
-                    <span style={{ fontSize: 26 }}>{LOGOS[c.type]}</span>
-                    {!allowed && <UpgradeBadge plan={minimumPlanForIntegration(c.type)} />}
-                  </div>
-                  <strong>{c.label}</strong>
-                  <span className="muted small">{c.description}</span>
-                </button>
-              );
-            })}
-          </div>
-          {!me.server.emailAvailable && <p className="hint" style={{ marginTop: 12 }}>E-mail delivery needs SMTP_URL configured on the server.</p>}
-        </Card>
+        ORDER.map((cat) => (
+          <Card key={cat} title={INTEGRATION_CATEGORIES[cat].label}>
+            <div className="grid-3">
+              {INTEGRATION_CATEGORIES[cat].types.map((type) => {
+                const c = connectorOf(type);
+                if (!c) return null;
+                const allowed = PLANS[me.account.plan].integrations.includes(c.type);
+                return (
+                  <button key={c.type} className="card integration-tile" style={{ background: 'var(--surface-2)', boxShadow: 'none' }} onClick={() => (allowed ? setEditing({ connector: c }) : navigate('/billing'))}>
+                    <div className="spread">
+                      <LogoTile type={c.type} />
+                      {!allowed ? <UpgradeBadge plan={minimumPlanForIntegration(c.type)} /> : c.syncsStatus ? <span className="badge"><Icons.sync size={11} /> Syncs status</span> : null}
+                    </div>
+                    <strong>{c.label}</strong>
+                    <span className="muted small">{c.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        ))
       )}
+      {!editing && !me.server.emailAvailable && <p className="hint">E-mail delivery needs SMTP_URL configured on the server.</p>}
     </div>
   );
 }
@@ -134,6 +137,7 @@ function IntegrationForm({
   connector,
   integration,
   categories,
+  showHook,
   onCancel,
   onSaved,
 }: {
@@ -141,6 +145,7 @@ function IntegrationForm({
   connector: ConnectorInfo;
   integration?: Integration;
   categories: string[];
+  showHook: boolean;
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -172,7 +177,13 @@ function IntegrationForm({
   };
 
   return (
-    <Card title={`${LOGOS[connector.type]} ${integration ? 'Edit' : 'Connect'} ${connector.label}`}>
+    <Card
+      title={
+        <span className="row" style={{ gap: 10 }}>
+          <LogoTile type={connector.type} /> {integration ? 'Edit' : 'Connect'} {connector.label}
+        </span>
+      }
+    >
       <form className="stack" onSubmit={submit}>
         <p className="muted">{connector.description}</p>
         <Field label="Name">
@@ -205,10 +216,27 @@ function IntegrationForm({
             </div>
           </Field>
         )}
+        {connector.syncsStatus && showHook && (
+          <div className="notice stack-sm">
+            <strong>Live status updates</strong>
+            <span>
+              Lumora checks the status of linked {connector.label} tickets every couple of minutes. For instant updates, add this URL as a webhook in{' '}
+              {connector.label} (issue/ticket updated events):
+            </span>
+            {integration?.hookUrl ? (
+              <div className="row" style={{ flexWrap: 'nowrap' }}>
+                <code style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{integration.hookUrl}</code>
+                <CopyButton text={integration.hookUrl} />
+              </div>
+            ) : (
+              <span className="muted small">The URL appears here once the destination is saved.</span>
+            )}
+          </div>
+        )}
         {error && <div className="notice notice-danger">{error}</div>}
         <div className="row">
           <button className="btn btn-primary" disabled={busy}>
-            {busy ? 'Connecting…' : integration ? 'Save & test' : 'Connect & test'}
+            {busy ? 'Connecting…' : integration ? 'Save and test' : 'Connect and test'}
           </button>
           <button type="button" className="btn" onClick={onCancel}>
             Cancel

@@ -14,6 +14,7 @@ import { config } from '../config';
 import { connectorCatalog, getConnector } from '../connectors';
 import { all, one, run, transaction } from '../db';
 import { aiAvailable } from '../lib/ai';
+import { centerRouter } from './center';
 import { hashPassword, id, randomToken, verifyPassword } from '../lib/crypto';
 import {
   accountPlan,
@@ -195,10 +196,11 @@ export function appRouter(): Router {
       config_enc: sealConfig(cfg),
       categories: JSON.stringify(cleanCategories(req.body.categories)),
       enabled: 1,
+      hook_token: randomToken(24),
       created_at: new Date().toISOString(),
     };
     run(
-      'INSERT INTO integrations (id, project_id, type, name, config_enc, categories, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO integrations (id, project_id, type, name, config_enc, categories, enabled, hook_token, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       row.id,
       row.project_id,
       row.type,
@@ -206,6 +208,7 @@ export function appRouter(): Router {
       row.config_enc,
       row.categories,
       row.enabled,
+      row.hook_token,
       row.created_at,
     );
     res.status(201).json(serializeIntegration(row));
@@ -250,32 +253,11 @@ export function appRouter(): Router {
 
   // ------------------------------------------------------------ Tickets
 
-  router.get('/projects/:id/tickets', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
-    const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const q = str(req.query.q, 100);
-    const rows = q
-      ? all<TicketRow>(
-          `SELECT * FROM tickets WHERE project_id = ? AND (title LIKE ? OR reference LIKE ? OR reporter_email LIKE ?)
-           ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-          project.id, `%${q}%`, `%${q}%`, `%${q}%`, limit, offset,
-        )
-      : all<TicketRow>('SELECT * FROM tickets WHERE project_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?', project.id, limit, offset);
-    const total = one<{ n: number }>('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ?', project.id)!.n;
-    res.json({ total, items: rows.map((r) => serializeTicket(r)) });
-  });
+  // List, filters, metrics and status live in routes/center.ts.
+  router.use(centerRouter());
 
   router.get('/tickets/:id', (req, res) => {
     res.json(serializeTicket(ownedTicket(req), true));
-  });
-
-  router.patch('/tickets/:id', (req, res) => {
-    const ticket = ownedTicket(req);
-    const status = str(req.body.status, 20);
-    if (!['new', 'forwarded', 'delivery_failed', 'resolved'].includes(status)) throw new HttpError(400, 'Invalid status');
-    run('UPDATE tickets SET status = ? WHERE id = ?', status, ticket.id);
-    res.json({ ok: true });
   });
 
   router.post('/tickets/:id/resend', async (req, res) => {

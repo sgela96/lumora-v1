@@ -1,5 +1,5 @@
 import type { Project } from '../api';
-import { Card, CopyButton, PageHead } from '../components/ui';
+import { Card, CopyButton, SectionIntro } from '../components/ui';
 import { useApp } from '../state';
 
 export function InstallPage({ project }: { project: Project }) {
@@ -31,15 +31,15 @@ Lumora('show');`;
 
   return (
     <div className="stack">
-      <PageHead
-        title="Install Lumora"
-        subtitle={`Add the sun to ${project.name} in under a minute.`}
+      <SectionIntro
         actions={
-          <a className="btn" href={demoUrl} target="_blank" rel="noreferrer">
-            Try it on a demo page ↗
+          <a className="btn" href={demoUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+            Try it on a demo page
           </a>
         }
-      />
+      >
+        Add Lumora to {project.name} in under a minute.
+      </SectionIntro>
 
       <Card title="1 · Paste one line before </body>">
         <div className="stack">
@@ -52,7 +52,7 @@ Lumora('show');`;
             {project.allowedOrigins.length === 0 && (
               <>
                 {' '}
-                <strong>Tip:</strong> restrict which domains can use this key in <a href={`#/projects/${project.id}/settings`}>Site settings</a>.
+                <strong>Tip:</strong> restrict which domains can use this key in <a href={`#/p/${project.id}/settings/general`}>General</a>.
               </>
             )}
           </p>

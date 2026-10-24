@@ -1,4 +1,4 @@
-import type { PlanId, PlanLimits, ProjectSettings, ReportPayload, IntegrationType } from '@lumora/shared';
+import type { IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -38,6 +38,8 @@ export interface ConnectorInfo {
   type: IntegrationType;
   label: string;
   description: string;
+  category: IntegrationCategory;
+  syncsStatus: boolean;
   fields: { key: string; label: string; type: 'text' | 'password' | 'url' | 'email'; required: boolean; placeholder?: string; help?: string }[];
 }
 
@@ -67,6 +69,8 @@ export interface Integration {
   enabled: boolean;
   categories: string[];
   config: Record<string, string>;
+  syncsStatus: boolean;
+  hookUrl: string | null;
   createdAt: string;
 }
 
@@ -76,9 +80,11 @@ export interface Delivery {
   name: string;
   status: 'pending' | 'sent' | 'failed';
   externalId?: string;
+  displayId?: string;
   url?: string;
   error?: string;
   at: string;
+  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string };
 }
 
 export interface TicketSummary {
@@ -88,7 +94,16 @@ export interface TicketSummary {
   title: string;
   category: string | null;
   reporterEmail: string | null;
-  status: string;
+  status: TicketStatus;
+  deliveryStatus: 'pending' | 'sent' | 'failed' | 'none';
+  externalStatus: string | null;
+  syncedAt: string | null;
+  resolvedAt: string | null;
+  issue: { fingerprint: string; label: string } | null;
+  pagePath: string | null;
+  browser: string | null;
+  os: string | null;
+  errorCount: number;
   deliveries: Delivery[];
   hasScreenshot: boolean;
   hasRecording: boolean;
@@ -102,4 +117,47 @@ export interface TicketDetail extends TicketSummary {
   payload: ReportPayload;
   screenshotUrl: string | null;
   recordingUrl: string | null;
+}
+
+export interface TicketList {
+  total: number;
+  items: TicketSummary[];
+  counts: Record<TicketStatus | 'all', number>;
+  facets: Record<'category' | 'browser' | 'page', { value: string; n: number }[]>;
+  historyDays: number;
+}
+
+export interface IssueGroup {
+  fingerprint: string;
+  label: string;
+  reports: number;
+  unresolved: number;
+  reporters: number;
+  firstSeen: string;
+  lastSeen: string;
+  latestId: string;
+  pages: string[];
+}
+
+export interface Metrics {
+  days: number;
+  totals: {
+    reports: number;
+    previous: number;
+    open: number;
+    inProgress: number;
+    resolved: number;
+    medianResolutionHours: number | null;
+    reporters: number;
+    withRecording: number;
+    withErrors: number;
+    deliveryFailures: number;
+  };
+  series: { day: string; created: number; resolved: number }[];
+  byCategory: { label: string; value: number }[];
+  byKind: { label: string; value: number }[];
+  byBrowser: { label: string; value: number }[];
+  byOs: { label: string; value: number }[];
+  topPages: { label: string; value: number }[];
+  topIssues: { fingerprint: string; label: string; reports: number; unresolved: number; lastSeen: string }[];
 }

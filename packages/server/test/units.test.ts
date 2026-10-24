@@ -57,8 +57,9 @@ test('plan clamping turns off features the plan lacks', () => {
   s.appearance.showBranding = false;
   s.capture.redactSelectors = ['.secret'];
   const starter = clampSettingsToPlan(s, 'starter');
-  assert.equal(starter.reportTypes.recording, false);
-  assert.equal(starter.capture.network.enabled, false);
+  assert.equal(starter.reportTypes.recording, true);
+  assert.equal(starter.recording.maxSeconds, 60, 'Starter recordings are capped at one minute');
+  assert.equal(starter.capture.network.enabled, true);
   assert.equal(starter.capture.aiSteps, false);
   assert.equal(starter.appearance.showBranding, true);
   assert.deepEqual(starter.capture.redactSelectors, []);

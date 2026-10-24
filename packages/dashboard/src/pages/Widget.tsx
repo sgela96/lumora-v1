@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { WidgetPosition } from '@lumora/shared';
 import type { Project } from '../api';
-import { Card, Field, PageHead, SaveBar, ToggleRow, useToast } from '../components/ui';
+import { Card, Field, SaveBar, SectionIntro, ToggleRow, useToast } from '../components/ui';
 import { useApp, useFeatureLock, useSettingsDraft } from '../state';
 
 const POSITIONS: { id: WidgetPosition; label: string }[] = [
@@ -33,7 +33,7 @@ export function WidgetPage({ project }: { project: Project }) {
 
   return (
     <div className="stack">
-      <PageHead title="Widget" subtitle="How the sun looks and what people can do with it." />
+      <SectionIntro>How the nebula looks on your app and what people can do with it.</SectionIntro>
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <div className="stack">
           <Card title="Appearance">
@@ -108,9 +108,9 @@ export function WidgetPage({ project }: { project: Project }) {
           </Card>
 
           <Card title="Ways to report">
-            <ToggleRow title="📸 Screenshot" description="Capture the page and mark it up (highlight, draw, hide private data)." checked={draft.reportTypes.screenshot} onChange={(v) => update((s) => void (s.reportTypes.screenshot = v))} />
+            <ToggleRow title="Screenshot" description="Capture the page and mark it up (highlight, draw, hide private data)." checked={draft.reportTypes.screenshot} onChange={(v) => update((s) => void (s.reportTypes.screenshot = v))} />
             <ToggleRow
-              title="🎥 Screen recording"
+              title="Screen recording"
               description="Users record what happens; Lumora writes the steps to reproduce from their clicks."
               checked={draft.reportTypes.recording}
               onChange={(v) => update((s) => void (s.reportTypes.recording = v))}
@@ -134,7 +134,7 @@ export function WidgetPage({ project }: { project: Project }) {
                 </Field>
               </div>
             </ToggleRow>
-            <ToggleRow title="✍️ Just describe it" description="A quick form without attachments." checked={draft.reportTypes.describe} onChange={(v) => update((s) => void (s.reportTypes.describe = v))} />
+            <ToggleRow title="Just describe it" description="A quick form without attachments." checked={draft.reportTypes.describe} onChange={(v) => update((s) => void (s.reportTypes.describe = v))} />
           </Card>
         </div>
 

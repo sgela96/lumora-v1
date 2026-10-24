@@ -8,6 +8,7 @@ import { one } from './db';
 import { verifyFileSignature } from './lib/crypto';
 import { appRouter, sendFile } from './routes/app';
 import { billingRouter, stripeWebhookRouter } from './routes/billing';
+import { statusHookRouter } from './routes/center';
 import { widgetRouter } from './routes/widget';
 import { HttpError, uploadsDir } from './services';
 
@@ -37,6 +38,7 @@ export function createApp(): express.Express {
   });
 
   app.use('/api/billing/webhook', stripeWebhookRouter());
+  app.use('/api/hooks/status', statusHookRouter());
   app.use('/api/widget', widgetRouter());
 
   app.use(express.json({ limit: '1mb' }));

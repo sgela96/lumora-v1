@@ -1,6 +1,7 @@
 import {
   buildSteps,
   formatOffset,
+  nebulaSvg,
   redactText,
   redactUrl,
   type Locale,
@@ -22,7 +23,7 @@ import { canvasToBlob, captureDisplay, captureDom } from '../capture/screenshot'
 import { el, formatDuration } from '../util';
 import { annotate } from './annotator';
 import { resolveLocale, STRINGS, type Strings } from './i18n';
-import { icons, sunSvg } from './icons';
+import { icons, sparkSvg } from './icons';
 import { STYLES } from './styles';
 
 type View = 'home' | 'form' | 'sending' | 'done' | 'error';
@@ -68,7 +69,8 @@ export class Widget {
   private notice = '';
   private values: Record<string, string | boolean> = {};
   private email = '';
-  private include = { console: true, network: true, environment: true, actions: true };
+  private autoCloseTimer?: number;
+  private closing = false;
   private invalid = new Set<string>();
   private result?: { reference: string; externalUrl?: string };
   private errorMessage = '';
@@ -109,17 +111,34 @@ export class Widget {
     const types = this.deps.config.settings.reportTypes;
     const onlyDescribe = !types.screenshot && !types.recording;
     this.setView(onlyDescribe || kind === 'describe' || this.hasDraft() ? 'form' : 'home');
-    this.panel.hidden = false;
+    if (this.panel.hidden || this.closing) {
+      // The nebula expands and the panel emerges from it.
+      this.closing = false;
+      this.panel.hidden = false;
+      this.play(this.panel, 'lu-opening');
+      this.play(this.orb(), 'lu-expand');
+    }
     this.launcher.setAttribute('data-open', 'true');
     this.launcher.setAttribute('aria-expanded', 'true');
     queueMicrotask(() => this.panel.querySelector<HTMLElement>('button, input, textarea, select')?.focus());
   }
 
   close(): void {
-    this.panel.hidden = true;
+    if (this.panel.hidden || this.closing) return;
+    window.clearTimeout(this.autoCloseTimer);
+    this.closing = true;
+    const finished = this.view === 'done';
+    // The panel folds back into the nebula, which contracts (or glows, after a report) and keeps turning.
+    this.play(this.panel, 'lu-closing', () => {
+      if (!this.closing) return; // reopened mid-animation
+      this.closing = false;
+      this.panel.hidden = true;
+      if (this.view === 'done' || this.view === 'error') this.resetForm();
+    });
+    this.play(this.orb(), finished ? 'lu-absorb' : 'lu-contract');
+    if (finished) this.burst(this.launcher, 6, 38);
     this.launcher.setAttribute('data-open', 'false');
     this.launcher.setAttribute('aria-expanded', 'false');
-    if (this.view === 'done' || this.view === 'error') this.resetForm();
   }
 
   toggle(): void {
@@ -159,9 +178,9 @@ export class Widget {
       title: this.t.launcher,
       'aria-haspopup': 'dialog',
       'aria-expanded': 'false',
-      'data-mood': 'happy',
+      'data-mood': 'calm',
     });
-    this.launcher.innerHTML = sunSvg(appearance.accentColor);
+    this.launcher.innerHTML = `<span class="lu-orb">${nebulaSvg({ accent: appearance.accentColor })}</span><span class="lu-alert-ring"></span><span class="lu-dot"></span>`;
     this.launcher.style[vertical] = oy;
     this.launcher.style[horizontal] = ox;
     this.launcher.addEventListener('click', () => this.toggle());
@@ -169,6 +188,8 @@ export class Widget {
     this.panel = el('div', { class: 'lu-panel', role: 'dialog', 'aria-label': this.t.launcher, hidden: true });
     this.panel.style[vertical] = `calc(${oy} + 76px)`;
     this.panel.style[horizontal] = ox;
+    // Grow out of (and shrink back into) the corner where the nebula lives.
+    this.panel.style.transformOrigin = `${vertical} ${horizontal}`;
     this.panel.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         this.close();
@@ -213,20 +234,21 @@ export class Widget {
       ]);
       this.panel.append(el('div', { class: 'lu-header' }, [title, closeBtn]), el('div', { class: 'lu-body' }, [this.renderForm()]));
     } else if (this.view === 'sending') {
-      const spinner = el('div', { class: 'lu-center' }, [el('div', { class: 'lu-done-sun' }), el('h2', { text: t.sending })]);
-      spinner.querySelector('.lu-done-sun')!.innerHTML = sunSvg(this.deps.config.settings.appearance.accentColor);
-      this.panel.append(el('div', { class: 'lu-body' }, [spinner]));
+      const stage = this.stage();
+      const sending = el('div', { class: 'lu-center lu-sending', role: 'status' }, [stage, el('h2', { text: t.sending }), el('p', { text: t.sendingHint })]);
+      this.panel.append(el('div', { class: 'lu-header' }), el('div', { class: 'lu-body' }, [sending]));
     } else if (this.view === 'done') {
-      const done = el('div', { class: 'lu-center' }, [
-        el('div', { class: 'lu-done-sun' }),
-        el('h2', { text: t.doneTitle }),
-        el('p', { text: t.doneBody }),
-        this.result ? el('div', { class: 'lu-ref', text: `${t.doneRef}: ${this.result.reference}` }) : null,
-      ]);
-      done.querySelector('.lu-done-sun')!.innerHTML = sunSvg(this.deps.config.settings.appearance.accentColor);
-      const ok = el('button', { class: 'lu-btn lu-btn-primary', type: 'button', text: t.doneClose });
+      const stage = this.stage();
+      stage.append(el('span', { class: 'lu-wave' }), el('span', { class: 'lu-wave' }));
+      const ref = this.result ? el('div', { class: 'lu-ref' }, [`${t.doneRef} `, el('b', { text: this.result.reference })]) : null;
+      const progress = el('div', { class: 'lu-progress', 'aria-hidden': 'true' }, [el('span')]);
+      const done = el('div', { class: 'lu-center lu-thanks', role: 'status' }, [stage, el('h2', { text: t.doneTitle }), el('p', { text: t.doneBody }), ref, progress]);
+      const ok = el('button', { class: 'lu-btn lu-btn-plain', type: 'button', text: t.doneClose });
       ok.addEventListener('click', () => this.close());
       this.panel.append(el('div', { class: 'lu-header' }, [closeBtn]), el('div', { class: 'lu-body' }, [done, ok]));
+      // A burst of light from the nebula, then the panel folds back into the corner on its own.
+      window.setTimeout(() => this.burst(stage, 14, 90), 250);
+      this.scheduleAutoClose(5200);
     } else if (this.view === 'error') {
       const retry = el('button', { class: 'lu-btn lu-btn-primary', type: 'button', text: t.retry });
       retry.addEventListener('click', () => this.submit());
@@ -241,7 +263,9 @@ export class Widget {
     }
 
     if (this.deps.config.settings.appearance.showBranding) {
-      const link = el('a', { href: 'https://lumora.app', target: '_blank', rel: 'noopener', text: 'Lumora ☀' });
+      const mini = el('span', { class: 'lu-mini' });
+      mini.innerHTML = nebulaSvg({ accent: this.deps.config.settings.appearance.accentColor, detail: 'low' });
+      const link = el('a', { href: 'https://lumora.app', target: '_blank', rel: 'noopener' }, [mini, 'Lumora']);
       this.panel.append(el('div', { class: 'lu-footer' }, [t.poweredBy, link]));
     }
   }
@@ -255,6 +279,9 @@ export class Widget {
       iconBox.innerHTML = icon;
       b.append(iconBox, el('div', {}, [el('strong', { text: title }), el('span', { text: hint })]));
       if (badge) b.append(el('span', { class: 'lu-badge', text: badge }));
+      const chev = el('span', { class: 'lu-chev-right' });
+      chev.innerHTML = icons.chevronRight;
+      if (!badge) b.append(chev);
       b.addEventListener('click', onClick);
       return b;
     };
@@ -368,21 +395,18 @@ export class Widget {
       input.checked = this.values[field.id] === true;
       input.addEventListener('change', () => onValue(input.checked));
       wrap.append(el('label', { class: 'lu-check' }, [input, field.label]));
-    } else if (field.type === 'select' && (field.options?.length ?? 0) <= 5) {
-      // Few options read better as chips than as a dropdown.
-      const chips = el('div', { class: 'lu-chips', role: 'radiogroup', 'aria-label': field.label });
+    } else if (field.type === 'select' && (field.options?.length ?? 0) <= 4) {
+      // Few options read better as a segmented control than as a dropdown.
+      const group = el('div', { class: 'lu-segmented', role: 'radiogroup', 'aria-label': field.label });
       for (const option of field.options ?? []) {
-        const chip = el('button', { class: 'lu-chip', type: 'button', role: 'radio', 'aria-pressed': String(this.values[field.id] === option), 'aria-checked': String(this.values[field.id] === option), text: option });
-        chip.addEventListener('click', () => {
+        const segment = el('button', { class: 'lu-segment', type: 'button', role: 'radio', 'aria-checked': String(this.values[field.id] === option), text: option });
+        segment.addEventListener('click', () => {
           onValue(option);
-          chips.querySelectorAll('.lu-chip').forEach((c) => {
-            c.setAttribute('aria-pressed', String(c === chip));
-            c.setAttribute('aria-checked', String(c === chip));
-          });
+          group.querySelectorAll('.lu-segment').forEach((c) => c.setAttribute('aria-checked', String(c === segment)));
         });
-        chips.append(chip);
+        group.append(segment);
       }
-      wrap.append(el('label', {}, [field.label, field.required ? el('span', { class: 'lu-req', text: '*' }) : null]), chips);
+      wrap.append(el('div', { class: 'lu-label' }, [field.label, field.required ? el('span', { class: 'lu-req', 'aria-hidden': 'true', text: '*' }) : null]), group);
     } else if (field.type === 'select') {
       const select = el('select', { class: 'lu-select', id }, [el('option', { value: '', text: '—' }), ...(field.options ?? []).map((o) => el('option', { value: o, text: o }))]);
       select.value = String(this.values[field.id] ?? '');
@@ -401,26 +425,19 @@ export class Widget {
     return wrap;
   }
 
+  /** Technical details always travel with the report; the user is told what, not asked. */
   private renderIncludedData(): HTMLElement | null {
     const t = this.t;
     const c = this.deps.config.settings.capture;
-    const rows: HTMLElement[] = [];
-    const toggle = (key: keyof Widget['include'], label: string) => {
-      const input = el('input', { type: 'checkbox' });
-      input.checked = this.include[key];
-      input.addEventListener('change', () => (this.include[key] = input.checked));
-      rows.push(el('label', { class: 'lu-check' }, [input, label]));
-    };
-    if (c.console.enabled) toggle('console', t.dataConsole(this.deps.console.entries(c.console.levels, c.console.maxEntries).length));
-    if (c.network.enabled) toggle('network', t.dataNetwork(this.deps.network.entries(true, c.network.maxEntries).length));
-    if (c.breadcrumbs && !this.recording) toggle('actions', t.dataActions(this.deps.actions.recent(20).length));
-    if (c.environment) toggle('environment', t.dataEnvironment);
-    if (!rows.length) return null;
-    const summary = el('summary', {}, [t.includedData]);
-    const chev = el('span', { class: 'lu-chev' });
-    chev.innerHTML = icons.chevron;
-    summary.append(chev);
-    return el('details', { class: 'lu-data' }, [summary, el('div', { class: 'lu-data-body' }, [el('p', { text: t.includedDataHint }), ...rows])]);
+    const parts: string[] = [];
+    if (c.console.enabled) parts.push(t.dataConsole);
+    if (c.network.enabled) parts.push(t.dataNetwork);
+    if (c.breadcrumbs || (this.recording && c.recordingSteps)) parts.push(t.dataActions);
+    if (c.environment) parts.push(t.dataEnvironment);
+    if (!parts.length) return null;
+    const box = el('div', { class: 'lu-info' }, [el('span'), el('div', {}, [el('strong', { text: t.includedData }), ` ${t.includedDataHint(listFormat(parts, this.locale))}`])]);
+    box.firstElementChild!.outerHTML = icons.info;
+    return box;
   }
 
   // ---------- Screenshot ----------
@@ -595,22 +612,22 @@ export class Widget {
       reporter,
       metadata: this.deps.getMetadata(),
     };
-    if (c.environment && this.include.environment) {
+    if (c.environment) {
       const env = captureEnvironment();
       payload.environment = scrub ? { ...env, url: redactUrl(env.url), referrer: redactUrl(env.referrer) } : env;
     }
-    if (c.console.enabled && this.include.console) {
+    if (c.console.enabled) {
       payload.console = this.deps.console.entries(c.console.levels, c.console.maxEntries).map((e) => ({
         ...e,
         message: text(e.message),
         stack: e.stack ? text(e.stack) : undefined,
       }));
     }
-    if (c.network.enabled && this.include.network) {
+    if (c.network.enabled) {
       payload.network = this.deps.network.entries(c.network.failedOnly, c.network.maxEntries).map((e) => ({ ...e, url: scrub ? redactUrl(e.url) : e.url }));
     }
     const cleanAction = (a: UserAction): UserAction => ({ ...a, label: text(a.label), value: a.value ? text(a.value) : undefined });
-    if (c.breadcrumbs && this.include.actions) payload.breadcrumbs = this.deps.actions.recent(20).map(cleanAction);
+    if (c.breadcrumbs) payload.breadcrumbs = this.deps.actions.recent(20).map(cleanAction);
     if (this.recording) {
       payload.recordingDurationMs = this.recording.durationMs;
       if (c.recordingSteps) payload.recordingActions = this.recording.actions.map(cleanAction);
@@ -627,7 +644,6 @@ export class Widget {
     this.email = '';
     this.invalid.clear();
     this.result = undefined;
-    this.include = { console: true, network: true, environment: true, actions: true };
     this.values = {};
     for (const field of this.deps.config.settings.template.fields) {
       if (field.type === 'select' && field.options?.length) this.values[field.id] = field.options[0];
@@ -645,9 +661,9 @@ export class Widget {
   private onPageError(): void {
     if (!this.deps.config.settings.appearance.proactiveOnError) return;
     if (!this.panel.hidden || this.recorder || this.launcher.hidden) return;
-    this.launcher.setAttribute('data-mood', 'worried');
+    this.launcher.setAttribute('data-mood', 'alert');
     window.clearTimeout(this.moodTimer);
-    this.moodTimer = window.setTimeout(() => this.launcher.setAttribute('data-mood', 'happy'), 20000);
+    this.moodTimer = window.setTimeout(() => this.launcher.setAttribute('data-mood', 'calm'), 20000);
     if (this.proactiveShown) return;
     this.proactiveShown = true;
     const report = el('button', { class: 'lu-btn lu-btn-small', type: 'button', text: this.t.proactiveCta });
@@ -665,10 +681,73 @@ export class Widget {
 
   private hideTooltip(): void {
     this.tooltip.hidden = true;
-    this.launcher.setAttribute('data-mood', 'happy');
+    this.launcher.setAttribute('data-mood', 'calm');
   }
 
   // ---------- Helpers ----------
+
+  private orb(): HTMLElement {
+    return this.launcher.querySelector('.lu-orb') as HTMLElement;
+  }
+
+  /** Restarts a one-shot CSS animation class and removes it when done. */
+  private play(node: HTMLElement, className: string, onEnd?: () => void): void {
+    node.classList.remove('lu-opening', 'lu-closing', 'lu-expand', 'lu-contract', 'lu-absorb');
+    void node.offsetWidth;
+    node.classList.add(className);
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const done = () => {
+      node.classList.remove(className);
+      onEnd?.();
+    };
+    if (reduced) return done();
+    node.addEventListener('animationend', (e) => e.target === node && done(), { once: true });
+  }
+
+  /** A large nebula for the sending / thank-you states. */
+  private stage(): HTMLElement {
+    const big = el('div', { class: 'lu-big' });
+    big.innerHTML = nebulaSvg({ accent: this.deps.config.settings.appearance.accentColor });
+    return el('div', { class: 'lu-stage' }, [big]);
+  }
+
+  /** Little four-point stars flying out of a node — the "thank you" sparkle. */
+  private burst(container: HTMLElement, count: number, distance: number): void {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const host = container === this.launcher ? this.launcher : container;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+      const reach = distance * (0.6 + Math.random() * 0.5);
+      const spark = el('span', { class: 'lu-spark' });
+      spark.innerHTML = sparkSvg;
+      spark.style.setProperty('--dx', `${Math.cos(angle) * reach}px`);
+      spark.style.setProperty('--dy', `${Math.sin(angle) * reach}px`);
+      spark.style.setProperty('--s', `${0.6 + Math.random() * 0.9}`);
+      spark.style.animationDelay = `${Math.random() * 0.15}s`;
+      if (i % 3 === 0) spark.style.color = '#F7B89B';
+      if (i % 3 === 1) spark.style.color = '#FFE7A8';
+      host.append(spark);
+      window.setTimeout(() => spark.remove(), 1900);
+    }
+  }
+
+  private scheduleAutoClose(ms: number): void {
+    window.clearTimeout(this.autoCloseTimer);
+    this.panel.style.setProperty('--lu-countdown', `${ms}ms`);
+    let remaining = ms;
+    let started = Date.now();
+    const arm = () => {
+      started = Date.now();
+      this.autoCloseTimer = window.setTimeout(() => this.view === 'done' && this.close(), remaining);
+    };
+    // Hovering keeps the thank-you on screen (the progress bar pauses too).
+    this.panel.onmouseenter = () => {
+      window.clearTimeout(this.autoCloseTimer);
+      remaining -= Date.now() - started;
+    };
+    this.panel.onmouseleave = () => this.view === 'done' && arm();
+    arm();
+  }
 
   private hideAll(): void {
     this.panel.hidden = true;
@@ -712,6 +791,14 @@ export class Widget {
     b.append(label);
     b.addEventListener('click', onClick);
     return b;
+  }
+}
+
+function listFormat(items: string[], locale: Locale): string {
+  try {
+    return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(items);
+  } catch {
+    return items.join(', ');
   }
 }
 

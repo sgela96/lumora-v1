@@ -1,3 +1,4 @@
+import { NEBULA_DEFAULT_ACCENT } from './nebula';
 import { PLANS } from './plans';
 import type { PlanId, ProjectSettings } from './types';
 
@@ -43,7 +44,7 @@ export function defaultSettings(): ProjectSettings {
   return {
     appearance: {
       position: 'bottom-right',
-      accentColor: '#F59E0B',
+      accentColor: NEBULA_DEFAULT_ACCENT,
       theme: 'auto',
       locale: 'auto',
       greeting: '',

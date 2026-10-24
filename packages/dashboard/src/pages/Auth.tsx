@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../api';
-import { Field } from '../components/ui';
+import { Field, Nebula } from '../components/ui';
 
 export function AuthPage({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<'login' | 'register'>(location.hash.includes('register') ? 'register' : 'login');
@@ -27,8 +27,8 @@ export function AuthPage({ onDone }: { onDone: () => void }) {
   return (
     <div className="auth-wrap">
       <form className="card auth-card stack" onSubmit={submit}>
-        <div className="row" style={{ gap: 12 }}>
-          <div className="brand-sun" />
+        <div style={{ textAlign: 'center' }}>
+          <Nebula className="mark" />
           <div>
             <h1>{mode === 'login' ? 'Welcome back' : 'Start your free trial'}</h1>
             <p className="muted small">{mode === 'login' ? 'Sign in to Lumora' : '14 days of Pro, no card required'}</p>

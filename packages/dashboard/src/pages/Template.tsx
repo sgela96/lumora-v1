@@ -1,6 +1,6 @@
 import { DEFAULT_DESCRIPTION_TEMPLATE, DEFAULT_TITLE_TEMPLATE, type FieldType, type TemplateField } from '@lumora/shared';
 import type { Project } from '../api';
-import { Card, Field, PageHead, SaveBar, UpgradeBadge, useToast } from '../components/ui';
+import { Card, Field, SaveBar, SectionIntro, UpgradeBadge, useToast } from '../components/ui';
 import { useApp, useFeatureLock, useSettingsDraft } from '../state';
 
 const TYPES: { id: FieldType; label: string }[] = [
@@ -43,11 +43,7 @@ export function TemplatePage({ project }: { project: Project }) {
 
   return (
     <div className="stack">
-      <PageHead
-        title="Ticket template"
-        subtitle="The form users fill in and how the ticket reads in your support tool."
-        actions={locked && <UpgradeBadge plan={locked} />}
-      />
+      <SectionIntro actions={locked && <UpgradeBadge plan={locked} />}>The form people fill in, and how the ticket reads in your tracker.</SectionIntro>
       {locked && <div className="notice notice-accent">Your plan uses the default template. Upgrade to customize fields and the ticket layout.</div>}
 
       <fieldset disabled={!!locked} style={{ border: 0, padding: 0, margin: 0 }} className="stack">

@@ -1,15 +1,44 @@
 import type { PlanId } from './types';
 
 export type IntegrationType =
+  // Messaging & generic
   | 'webhook'
   | 'slack'
   | 'email'
+  // Issue / defect trackers
   | 'jira'
+  | 'azure_devops'
+  | 'github'
+  | 'gitlab'
+  | 'linear'
+  | 'clickup'
+  | 'asana'
+  | 'shortcut'
+  | 'youtrack'
+  | 'trello'
+  // Help desks
   | 'zendesk'
   | 'freshdesk'
-  | 'github'
-  | 'linear'
-  | 'salesforce';
+  | 'hubspot'
+  // Enterprise service management
+  | 'salesforce'
+  | 'servicenow'
+  | 'freshservice';
+
+export type IntegrationCategory = 'trackers' | 'helpdesks' | 'enterprise' | 'messaging';
+
+export const INTEGRATION_CATEGORIES: Record<IntegrationCategory, { label: string; types: IntegrationType[] }> = {
+  trackers: {
+    label: 'Issue & defect trackers',
+    types: ['jira', 'azure_devops', 'github', 'gitlab', 'linear', 'clickup', 'asana', 'shortcut', 'youtrack', 'trello'],
+  },
+  helpdesks: { label: 'Help desks', types: ['zendesk', 'freshdesk', 'hubspot'] },
+  enterprise: { label: 'Enterprise service management', types: ['salesforce', 'servicenow', 'freshservice'] },
+  messaging: { label: 'Messaging & automation', types: ['webhook', 'slack', 'email'] },
+};
+
+/** Workflow status of a report, synced from the linked ticket when there is one. */
+export type TicketStatus = 'open' | 'in_progress' | 'resolved';
 
 export interface PlanLimits {
   id: PlanId;
@@ -20,6 +49,8 @@ export interface PlanLimits {
   reportsPerMonth: number;
   /** Active ticket destinations per project. */
   destinationsPerProject: number;
+  /** How far back the Reports list goes (days). */
+  historyDays: number;
   integrations: IntegrationType[];
   features: {
     screenshot: boolean;
@@ -37,62 +68,68 @@ export interface PlanLimits {
     removeBranding: boolean;
     redactionRules: boolean;
     routingByCategory: boolean;
+    /** Support Center: metrics dashboard, status sync with linked tickets, issue grouping, saved views. */
+    supportCenter: boolean;
   };
   highlights: string[];
 }
 
-const BASIC_INTEGRATIONS: IntegrationType[] = ['webhook', 'slack', 'email'];
-const PRO_INTEGRATIONS: IntegrationType[] = [...BASIC_INTEGRATIONS, 'jira', 'zendesk', 'freshdesk', 'github', 'linear'];
-const ALL_INTEGRATIONS: IntegrationType[] = [...PRO_INTEGRATIONS, 'salesforce'];
+const MESSAGING: IntegrationType[] = INTEGRATION_CATEGORIES.messaging.types;
+const TRACKERS: IntegrationType[] = INTEGRATION_CATEGORIES.trackers.types;
+const HELPDESKS: IntegrationType[] = INTEGRATION_CATEGORIES.helpdesks.types;
+const ENTERPRISE: IntegrationType[] = INTEGRATION_CATEGORIES.enterprise.types;
 
 export const PLANS: Record<PlanId, PlanLimits> = {
   starter: {
     id: 'starter',
     name: 'Starter',
     priceMonthlyUsd: 19,
-    tagline: 'For small sites that want better bug reports.',
+    tagline: 'Complete bug reports, straight into your tracker.',
     projects: 1,
-    reportsPerMonth: 100,
+    reportsPerMonth: 150,
     destinationsPerProject: 1,
-    integrations: BASIC_INTEGRATIONS,
+    historyDays: 30,
+    integrations: [...TRACKERS, ...MESSAGING],
     features: {
       screenshot: true,
       annotation: true,
-      recording: false,
-      recordingMaxSeconds: 0,
+      recording: true,
+      recordingMaxSeconds: 60,
       microphone: false,
       console: true,
-      network: false,
-      breadcrumbs: false,
-      recordingSteps: false,
+      network: true,
+      breadcrumbs: true,
+      recordingSteps: true,
       aiSteps: false,
       customTemplate: false,
       userIdentity: true,
       removeBranding: false,
       redactionRules: false,
       routingByCategory: false,
+      supportCenter: false,
     },
     highlights: [
-      '1 site, 100 reports / month',
-      'Screenshots with annotation',
-      'Console errors + environment',
-      'Webhook, Slack & e-mail',
+      '1 app, 150 reports / month',
+      'Screenshots, 1-min recordings → written steps',
+      'Console, network & environment, always attached',
+      'Jira, Azure DevOps, GitHub, GitLab, Linear & more',
     ],
   },
   pro: {
     id: 'pro',
     name: 'Pro',
-    priceMonthlyUsd: 49,
-    tagline: 'For product teams that live in their ticketing tool.',
-    projects: 3,
-    reportsPerMonth: 1000,
-    destinationsPerProject: 2,
-    integrations: PRO_INTEGRATIONS,
+    priceMonthlyUsd: 59,
+    tagline: 'For product and support teams shipping every week.',
+    projects: 5,
+    reportsPerMonth: 1500,
+    destinationsPerProject: 3,
+    historyDays: 90,
+    integrations: [...TRACKERS, ...HELPDESKS, ...MESSAGING],
     features: {
       screenshot: true,
       annotation: true,
       recording: true,
-      recordingMaxSeconds: 120,
+      recordingMaxSeconds: 300,
       microphone: true,
       console: true,
       network: true,
@@ -104,24 +141,26 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       removeBranding: true,
       redactionRules: false,
       routingByCategory: false,
+      supportCenter: false,
     },
     highlights: [
-      '3 sites, 1,000 reports / month',
-      'Screen recording (2 min) → written steps',
-      'Network failures & user breadcrumbs',
-      'Jira, Zendesk, Freshdesk, GitHub, Linear',
-      'Custom ticket templates, no branding',
+      '5 apps, 1,500 reports / month',
+      '5-min recordings with narration',
+      'Custom ticket templates, your branding',
+      '+ Zendesk, Freshdesk, HubSpot',
+      'Up to 3 destinations per app',
     ],
   },
   business: {
     id: 'business',
     name: 'Business',
-    priceMonthlyUsd: 149,
-    tagline: 'For support orgs with many apps and strict data rules.',
+    priceMonthlyUsd: 179,
+    tagline: 'A support command center for every app you run.',
     projects: 25,
-    reportsPerMonth: 10000,
+    reportsPerMonth: 15000,
     destinationsPerProject: 10,
-    integrations: ALL_INTEGRATIONS,
+    historyDays: 730,
+    integrations: [...TRACKERS, ...HELPDESKS, ...ENTERPRISE, ...MESSAGING],
     features: {
       screenshot: true,
       annotation: true,
@@ -138,13 +177,15 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       removeBranding: true,
       redactionRules: true,
       routingByCategory: true,
+      supportCenter: true,
     },
     highlights: [
-      '25 sites, 10,000 reports / month',
-      'Recording up to 10 min',
-      'AI-written steps to reproduce & summary',
-      'Salesforce Service Cloud cases',
-      'Routing by category, redaction rules',
+      'Support Center: live dashboard & report repository',
+      'Status synced back from Jira, Zendesk, ServiceNow…',
+      'Similar reports grouped into issues',
+      'AI-written steps & summaries',
+      '+ Salesforce, ServiceNow, Freshservice',
+      '25 apps, 15,000 reports / month',
     ],
   },
 };

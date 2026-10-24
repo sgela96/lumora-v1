@@ -1,6 +1,6 @@
 import { toHtml, toJiraWiki, toPlain } from '../lib/markdown';
 import { basicAuth, ConnectorError, fileBlob, normalizeBaseUrl, request, required } from './http';
-import type { Connector } from './types';
+import type { Connector, ExternalStatus } from './types';
 
 // ---------------------------------------------------------------- Jira Cloud
 
@@ -55,6 +55,16 @@ export const jira: Connector = {
     });
     return `Connected to project “${project.name}”.`;
   },
+  async fetchStatus(cfg, key) {
+    required(cfg, 'siteUrl', 'email', 'apiToken');
+    const base = normalizeBaseUrl(cfg.siteUrl);
+    const issue = await request<{ fields: { status: { name: string; statusCategory?: { key: string } } } }>(
+      `${base}/rest/api/2/issue/${encodeURIComponent(key)}?fields=status`,
+      { headers: { Authorization: basicAuth(cfg.email, cfg.apiToken), Accept: 'application/json' } },
+    );
+    const category = issue.fields.status.statusCategory?.key;
+    return { status: category === 'done' ? 'resolved' : category === 'indeterminate' ? 'in_progress' : 'open', label: issue.fields.status.name };
+  },
 };
 
 // ---------------------------------------------------------------- Zendesk
@@ -71,7 +81,7 @@ export const zendesk: Connector = {
   ],
   async send(ctx, cfg) {
     required(cfg, 'subdomain', 'email', 'apiToken');
-    const base = `https://${cfg.subdomain.replace(/\.zendesk\.com.*$/, '').replace(/^https?:\/\//, '')}.zendesk.com`;
+    const base = zendeskBase(cfg.subdomain);
     const auth = basicAuth(`${cfg.email}/token`, cfg.apiToken);
     const uploads: string[] = [];
     for (const file of ctx.files) {
@@ -103,14 +113,30 @@ export const zendesk: Connector = {
   },
   async test(cfg) {
     required(cfg, 'subdomain', 'email', 'apiToken');
-    const base = `https://${cfg.subdomain.replace(/\.zendesk\.com.*$/, '').replace(/^https?:\/\//, '')}.zendesk.com`;
+    const base = zendeskBase(cfg.subdomain);
     const me = await request<{ user: { name: string; role: string } }>(`${base}/api/v2/users/me.json`, {
       headers: { Authorization: basicAuth(`${cfg.email}/token`, cfg.apiToken) },
     });
     if (me.user.role === 'end-user') throw new ConnectorError('These credentials belong to an end-user, not an agent.');
     return `Connected as ${me.user.name}.`;
   },
+  async fetchStatus(cfg, id) {
+    required(cfg, 'subdomain', 'email', 'apiToken');
+    const res = await request<{ ticket: { status: string } }>(`${zendeskBase(cfg.subdomain)}/api/v2/tickets/${encodeURIComponent(id)}.json`, {
+      headers: { Authorization: basicAuth(`${cfg.email}/token`, cfg.apiToken) },
+    });
+    const status = res.ticket.status;
+    return { status: ['solved', 'closed'].includes(status) ? 'resolved' : ['pending', 'hold'].includes(status) ? 'in_progress' : 'open', label: capitalize(status) };
+  },
 };
+
+function zendeskBase(subdomain: string): string {
+  return `https://${subdomain.replace(/\.zendesk\.com.*$/, '').replace(/^https?:\/\//, '')}.zendesk.com`;
+}
+
+function capitalize(value: string): string {
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
 
 // ---------------------------------------------------------------- Freshdesk
 
@@ -150,7 +176,23 @@ export const freshdesk: Connector = {
     const me = await request<{ contact?: { name: string } }>(`${base}/api/v2/agents/me`, { headers: { Authorization: basicAuth(cfg.apiKey, 'X') } });
     return `Connected${me.contact?.name ? ` as ${me.contact.name}` : ''}.`;
   },
+  async fetchStatus(cfg, id) {
+    required(cfg, 'domain', 'apiKey');
+    const ticket = await request<{ status: number }>(`${normalizeBaseUrl(cfg.domain)}/api/v2/tickets/${encodeURIComponent(id)}`, {
+      headers: { Authorization: basicAuth(cfg.apiKey, 'X') },
+    });
+    return freshStatus(ticket.status);
+  },
 };
+
+/** Freshdesk / Freshservice numeric statuses: 2 Open, 3 Pending, 4 Resolved, 5 Closed (others are custom). */
+export function freshStatus(code: number): ExternalStatus {
+  const labels: Record<number, string> = { 2: 'Open', 3: 'Pending', 4: 'Resolved', 5: 'Closed' };
+  const label = labels[code] ?? `Status ${code}`;
+  if (code === 4 || code === 5) return { status: 'resolved', label };
+  if (code === 2) return { status: 'open', label };
+  return { status: 'in_progress', label };
+}
 
 // ---------------------------------------------------------------- GitHub Issues
 
@@ -183,13 +225,21 @@ export const github: Connector = {
         labels: (cfg.labels || '').split(',').map((l) => l.trim()).filter(Boolean),
       }),
     });
-    return { externalId: `#${issue.number}`, url: issue.html_url };
+    return { externalId: String(issue.number), displayId: `#${issue.number}`, url: issue.html_url };
   },
   async test(cfg) {
     required(cfg, 'repository', 'token');
     const repo = await request<{ full_name: string; has_issues: boolean }>(`https://api.github.com/repos/${repoPath(cfg.repository)}`, { headers: githubHeaders(cfg.token) });
     if (!repo.has_issues) throw new ConnectorError('Issues are disabled on this repository.');
     return `Connected to ${repo.full_name}.`;
+  },
+  async fetchStatus(cfg, id) {
+    required(cfg, 'repository', 'token');
+    const issue = await request<{ state: string; state_reason?: string | null }>(
+      `https://api.github.com/repos/${repoPath(cfg.repository)}/issues/${encodeURIComponent(id.replace(/^#/, ''))}`,
+      { headers: githubHeaders(cfg.token) },
+    );
+    return issue.state === 'closed' ? { status: 'resolved', label: issue.state_reason === 'not_planned' ? 'Closed (not planned)' : 'Closed' } : { status: 'open', label: 'Open' };
   },
 };
 
@@ -236,6 +286,16 @@ export const linear: Connector = {
     required(cfg, 'apiKey', 'teamKey');
     await linearTeamId(cfg);
     return `Connected to team ${cfg.teamKey.toUpperCase()}.`;
+  },
+  async fetchStatus(cfg, identifier) {
+    required(cfg, 'apiKey');
+    const data = await linearQuery<{ issue: { state: { name: string; type: string } } }>(
+      cfg,
+      `query($id: String!) { issue(id: $id) { state { name type } } }`,
+      { id: identifier },
+    );
+    const type = data.issue.state.type;
+    return { status: type === 'completed' || type === 'canceled' ? 'resolved' : type === 'started' ? 'in_progress' : 'open', label: data.issue.state.name };
   },
 };
 
@@ -305,11 +365,19 @@ export const salesforce: Connector = {
       });
     }
     const caseInfo = await request<{ CaseNumber: string }>(`${base}/services/data/${SF_API}/sobjects/Case/${created.id}?fields=CaseNumber`, { headers });
-    return { externalId: caseInfo.CaseNumber, url: `${base}/lightning/r/Case/${created.id}/view` };
+    return { externalId: created.id, displayId: caseInfo.CaseNumber, url: `${base}/lightning/r/Case/${created.id}/view` };
   },
   async test(cfg) {
     await salesforceToken(cfg);
     return 'Authenticated with Salesforce.';
+  },
+  async fetchStatus(cfg, caseId) {
+    const { base, token } = await salesforceToken(cfg);
+    const c = await request<{ Status: string; IsClosed: boolean }>(
+      `${base}/services/data/${SF_API}/sobjects/Case/${encodeURIComponent(caseId)}?fields=Status,IsClosed`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    return { status: c.IsClosed ? 'resolved' : c.Status === 'New' ? 'open' : 'in_progress', label: c.Status };
   },
 };
 

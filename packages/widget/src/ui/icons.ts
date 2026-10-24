@@ -1,45 +1,7 @@
 // Inline SVG markup. Strings are static (no user data), so innerHTML is safe here.
 
-let sunCounter = 0;
-
-/** The Lumora sun: glow, rotating rays, a face that blinks and worries on errors. */
-export function sunSvg(accent: string): string {
-  const id = `lu-sun-${++sunCounter}`;
-  const rays = Array.from({ length: 12 }, (_, i) => {
-    const long = i % 2 === 0;
-    return `<rect x="47.5" y="${long ? 2 : 7}" width="5" height="${long ? 16 : 11}" rx="2.5" transform="rotate(${i * 30} 50 50)" />`;
-  }).join('');
-  return `
-<svg viewBox="0 0 100 100" aria-hidden="true">
-  <defs>
-    <radialGradient id="${id}-core" cx="38%" cy="32%" r="75%">
-      <stop offset="0%" stop-color="#FFF3B0"/>
-      <stop offset="45%" stop-color="#FFD54A"/>
-      <stop offset="100%" stop-color="${accent}"/>
-    </radialGradient>
-    <radialGradient id="${id}-glow">
-      <stop offset="0%" stop-color="${accent}" stop-opacity=".55"/>
-      <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="${id}-ray" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#FFD54A"/>
-      <stop offset="100%" stop-color="${accent}"/>
-    </linearGradient>
-  </defs>
-  <circle class="lu-sun-glow" cx="50" cy="50" r="50" fill="url(#${id}-glow)"/>
-  <g class="lu-sun-rays"><g class="lu-sun-rays-inner" fill="url(#${id}-ray)">${rays}</g></g>
-  <g class="lu-sun-core">
-    <circle cx="50" cy="50" r="27" fill="url(#${id}-core)"/>
-    <circle cx="50" cy="50" r="27" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
-    <ellipse cx="38" cy="56" rx="4.5" ry="2.6" fill="#FF8A65" opacity=".45"/>
-    <ellipse cx="62" cy="56" rx="4.5" ry="2.6" fill="#FF8A65" opacity=".45"/>
-    <ellipse class="lu-sun-eye" cx="42" cy="47" rx="2.6" ry="3.4" fill="#5B3A00"/>
-    <ellipse class="lu-sun-eye" cx="58" cy="47" rx="2.6" ry="3.4" fill="#5B3A00"/>
-    <path class="lu-sun-mouth-happy" d="M42.5 56.5 Q50 63 57.5 56.5" fill="none" stroke="#5B3A00" stroke-width="2.6" stroke-linecap="round"/>
-    <ellipse class="lu-sun-mouth-worried" cx="50" cy="59" rx="3.2" ry="3.6" fill="#5B3A00"/>
-  </g>
-</svg>`;
-}
+/** Four-point star used in the thank-you sparkle. */
+export const sparkSvg = '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 0c.6 5.2 4.8 9.4 10 10-5.2.6-9.4 4.8-10 10-.6-5.2-4.8-9.4-10-10C5.2 9.4 9.4 5.2 10 0Z"/></svg>';
 
 const svg = (body: string, size = 20) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
@@ -51,6 +13,8 @@ export const icons = {
   close: svg('<path d="M18 6 6 18M6 6l12 12"/>', 18),
   back: svg('<path d="m15 18-6-6 6-6"/>', 18),
   chevron: svg('<path d="m6 9 6 6 6-6"/>', 16),
+  chevronRight: svg('<path d="m9 6 6 6-6 6"/>', 16),
+  info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>', 16),
   check: svg('<path d="M20 6 9 17l-5-5"/>', 16),
   stop: svg('<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>', 14),
   trash: svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', 14),

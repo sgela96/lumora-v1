@@ -1,7 +1,7 @@
 import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, type Catalog, type Me, type Project } from './api';
-import { ToastProvider } from './components/ui';
+import { Nebula, ToastProvider } from './components/ui';
 import { AuthPage } from './pages/Auth';
 import { Layout } from './pages/Layout';
 import { AppProvider } from './state';
@@ -27,7 +27,7 @@ function App() {
 
   const setMe = useCallback((me: Me) => setBoot((b) => (b.status === 'ready' ? { ...b, me } : b)), []);
 
-  if (boot.status === 'loading') return <div className="auth-wrap"><div className="brand-sun" style={{ width: 48, height: 48 }} /></div>;
+  if (boot.status === 'loading') return <div className="auth-wrap"><Nebula className="mark" /></div>;
   if (boot.status === 'anonymous') return <AuthPage onDone={load} />;
   if (boot.status === 'error') return <div className="auth-wrap"><div className="notice notice-danger">{boot.message}</div></div>;
   return (
