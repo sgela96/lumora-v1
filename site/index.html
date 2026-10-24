@@ -148,9 +148,10 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .mock-s{position:absolute;inset:18px;border-radius:12px;background:var(--paper);color:var(--ink);padding:16px;font-size:12px}
 .row-s{display:flex;flex-direction:column;gap:5px;color:var(--ink-3);font-size:11px}
 .in-s{position:relative;overflow:hidden;height:28px;border-radius:8px;background:#ECE9E2;display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
-.save-s{display:inline-flex;margin-top:14px;padding:7px 14px;border-radius:8px;background:#5B4CF0;color:#fff;font-weight:600}
-.mock-s .mark-hl{position:absolute;left:10px;bottom:8px;width:110px;height:46px;overflow:visible}
-.mark-hl rect{fill:rgba(255,214,102,.18);stroke:var(--sun-deep);stroke-width:2.5;stroke-dasharray:1;animation:hl 6s ease-in-out infinite}
+.hl-wrap{position:relative;display:inline-flex;margin-top:14px}
+.save-s{display:inline-flex;padding:7px 14px;border-radius:8px;background:#5B4CF0;color:#fff;font-weight:600}
+.hl-wrap .mark-hl{position:absolute;left:-7px;top:-7px;width:calc(100% + 14px);height:calc(100% + 14px);overflow:visible;pointer-events:none}
+.mark-hl rect{fill:rgba(255,214,102,.14);stroke:var(--sun-deep);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-dasharray:1;animation:hl 6s ease-in-out infinite}
 @keyframes hl{0%,12%{stroke-dashoffset:1;fill-opacity:0}30%,88%{stroke-dashoffset:0;fill-opacity:1}100%{stroke-dashoffset:0;opacity:0}}
 .redact{position:absolute;inset:0 auto 0 0;width:100%;background:var(--ink);border-radius:8px;transform-origin:left;animation:redact 6s ease-in-out infinite}
 @keyframes redact{0%,46%{transform:scaleX(0)}58%,88%{transform:scaleX(1)}100%{transform:scaleX(1);opacity:0}}
@@ -195,12 +196,22 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 /* scene 1 */
 .mini{position:absolute;inset:18px 18px 18px 18px;border-radius:12px;background:rgba(250,248,242,.08);padding:14px}
 .mini i{display:block;height:8px;border-radius:4px;background:rgba(250,248,242,.16);margin-bottom:10px}
-.mini .nb{position:absolute;right:12px;bottom:12px;width:40px;height:40px}
+.mini .nbw{position:absolute;right:12px;bottom:12px;width:40px;height:40px;animation:nbOpen 6s cubic-bezier(.32,.72,0,1) infinite}
+.mini .nb{position:absolute;inset:0}
+/* Same motion as the widget: lu-expand on open, lu-contract on close (packages/widget/src/ui/styles.ts). */
+@keyframes nbOpen{0%,40%{transform:scale(1)}46%{transform:scale(1.38) rotate(18deg);filter:brightness(1.15)}52%,79%{transform:scale(1.14) rotate(25deg)}85%{transform:scale(.8) rotate(10deg)}91%,100%{transform:scale(1)}}
+.wpop{position:absolute;right:12px;bottom:62px;width:min(190px,72%);padding:10px;border-radius:12px;background:var(--paper);color:var(--ink);font-size:11px;display:flex;flex-direction:column;gap:6px;transform-origin:bottom right;box-shadow:0 18px 40px -18px rgba(0,0,0,.7);animation:wpop 6s cubic-bezier(.32,.72,0,1) infinite}
+.wpop b{font-size:12px}
+.wpop span{display:flex;align-items:center;gap:6px;padding:6px 7px;border-radius:8px;background:#ECE9E2}
+.wpop i{width:12px;height:12px;border-radius:4px;background:var(--sun);margin:0!important}
+@keyframes wpop{0%,43%{opacity:0;transform:scale(.4);filter:blur(10px)}53%,79%{opacity:1;transform:none;filter:none}86%,100%{opacity:0;transform:scale(.3);filter:blur(8px)}}
 .mini .ring{position:absolute;right:12px;bottom:12px;width:40px;height:40px;border-radius:50%;border:2px solid var(--sun);animation:ring 2s ease-out infinite}
+.mini .tap{position:absolute;right:24px;bottom:24px;width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.7);opacity:0;animation:tap 6s ease-out infinite}
+@keyframes tap{0%,39%{opacity:0;transform:scale(.3)}40%{opacity:.9;transform:scale(.3)}46%{opacity:0;transform:scale(2.4)}77%{opacity:0;transform:scale(.3)}78%{opacity:.9;transform:scale(.3)}84%,100%{opacity:0;transform:scale(2.4)}}
 @keyframes ring{from{transform:scale(.8);opacity:.9}to{transform:scale(2);opacity:0}}
-.cursor{position:absolute;left:40%;top:30%;width:18px;height:18px;animation:cur 4s ease-in-out infinite}
+.cursor{position:absolute;left:30%;top:28%;width:18px;height:18px;opacity:0;z-index:2;animation:cur 6s cubic-bezier(.45,0,.25,1) infinite}
 .cursor svg{width:18px;height:18px;fill:#fff;stroke:var(--ink);stroke-width:1.2}
-@keyframes cur{0%,15%{transform:translate(0,0)}55%,80%{transform:translate(min(150px,24vw),76px)}100%{transform:translate(0,0)}}
+@keyframes cur{0%,8%{left:30%;top:28%;opacity:0;transform:none}14%{left:30%;top:28%;opacity:1}36%{left:calc(100% - 50px);top:calc(100% - 50px);transform:none}39%{transform:scale(.78)}43%{transform:none}74%{left:calc(100% - 50px);top:calc(100% - 50px);opacity:1;transform:none}77%{transform:scale(.78)}81%{transform:none;opacity:1}90%,100%{left:calc(100% - 50px);top:calc(100% - 50px);opacity:0}}
 /* scene 2 */
 .frame{position:absolute;inset:18px;border-radius:12px;background:rgba(250,248,242,.08);display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
 .frame i{border-radius:8px;background:rgba(250,248,242,.12)}
@@ -604,7 +615,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
         <div class="htrack">
           <article class="hcard">
             <div class="scene" aria-hidden="true">
-              <div class="mini"><i style="width:40%"></i><i style="width:70%"></i><i style="width:55%"></i><i style="width:62%"></i><span class="ring"></span><span class="nb" data-nebula="low"></span></div>
+              <div class="mini"><i style="width:40%"></i><i style="width:70%"></i><i style="width:55%"></i><i style="width:62%"></i><span class="ring"></span><span class="wpop"><b>Something not working?</b><span><i></i>Take a screenshot</span><span><i></i>Record my screen</span></span><span class="nbw"><span class="nb" data-nebula="low"></span></span><span class="tap"></span></div>
               <span class="cursor"><svg viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z"/></svg></span>
             </div>
             <div class="num"><b>01</b><span class="tag">Your user</span></div>
@@ -616,8 +627,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
             <div class="scene" aria-hidden="true">
               <div class="mock-s">
                 <div class="row-s"><span>Card number</span><span class="in-s">4242 4242 4242 4242<span class="redact"></span></span></div>
-                <span class="save-s">Save details</span>
-                <svg class="mark-hl" viewBox="0 0 96 44"><rect pathLength="1" x="2" y="2" width="92" height="40" rx="10"/></svg>
+                <span class="hl-wrap"><span class="save-s">Save details</span><svg class="mark-hl" viewBox="0 0 100 100" preserveAspectRatio="none"><rect pathLength="1" x="1" y="1" width="98" height="98" rx="16"/></svg></span>
                 <span class="note">Nothing happens!</span>
               </div>
             </div>
