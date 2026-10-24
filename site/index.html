@@ -24,6 +24,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
@@ -222,36 +223,82 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .tk .id{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
 .tk .ok{font-family:var(--mono);font-size:11px;color:#1A7F37}
 
-/* Pinned AI section */
-.aisec{padding:clamp(88px,10vw,130px) 0}
-@media (min-width:981px){@supports (animation-timeline:view()){
-  .aisec{height:2500px;padding:0;view-timeline-name:--ai}
-  .aipin{position:sticky;top:72px;height:calc(100vh - 72px);min-height:700px;display:flex;flex-direction:column;justify-content:center}
-  .fchip{animation:fly linear both;animation-timeline:--ai;animation-range:contain 4% contain 40%}
-  .core{animation:core linear both;animation-timeline:--ai;animation-range:contain 18% contain 46%}
-  .ans{animation:ans linear both;animation-timeline:--ai}
-  .a1{animation-range:contain 40% contain 55%}
-  .a2{animation-range:contain 50% contain 65%}
-  .a3{animation-range:contain 60% contain 75%}
-  .a4{animation-range:contain 68% contain 82%}
-}}
-@keyframes fly{from{opacity:1;transform:none}to{opacity:0;transform:translateX(200px) scale(.4)}}
-@keyframes core{from{transform:scale(.85);filter:saturate(.3)}50%{transform:scale(1.14)}to{transform:scale(1);filter:none}}
-@keyframes ans{from{opacity:.1;transform:translateY(24px)}to{opacity:1;transform:none}}
-.ai-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;align-items:end;margin-bottom:28px}
-.ai-head .d2{font-size:clamp(36px,4.4vw,68px)}
+/* Features carousel (Apple-style row of tall cards; each opens a modal) */
+.feat-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:clamp(32px,4vw,48px)}
+.feat-head>div:first-child{display:flex;flex-direction:column;gap:18px;max-width:680px}
+.ftrack{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none;padding-bottom:8px;
+  padding-left:max(max(clamp(16px,4vw,56px),env(safe-area-inset-left,0px)),calc((100vw - 1360px) / 2 + 56px));padding-right:max(16px,env(safe-area-inset-right,0px));scroll-padding-left:max(max(clamp(16px,4vw,56px),env(safe-area-inset-left,0px)),calc((100vw - 1360px) / 2 + 56px))}
+.ftrack::-webkit-scrollbar{display:none}
+.fcard{position:relative;flex:0 0 auto;width:clamp(280px,27vw,372px);height:clamp(460px,38vw,540px);border-radius:28px;scroll-snap-align:start;overflow:hidden;cursor:pointer;text-align:left;border:0;padding:30px;display:flex;flex-direction:column;gap:12px;font:inherit;color:var(--ink);transition:transform .5s var(--ease),box-shadow .5s}
+.fcard:hover{transform:translateY(-6px);box-shadow:0 30px 60px -36px rgba(27,26,23,.5)}
+.fcard .tag{color:var(--ink-2)}
+.fcard h3{font-size:clamp(24px,2.1vw,30px);line-height:1.1;letter-spacing:-.03em;font-weight:600;max-width:280px}
+.fcard .fscene{position:absolute;left:24px;right:24px;bottom:84px;height:46%;display:grid;place-items:center;pointer-events:none}
+.fcard .plus{position:absolute;right:20px;bottom:20px;width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-size:22px;line-height:1;transition:transform .45s var(--ease),background .3s}
+.fcard:hover .plus{transform:rotate(90deg);background:var(--sun);color:var(--ink)}
+.fcard.dark{background:radial-gradient(80% 60% at 50% 75%,#3A3324 0%,#1F1D1A 55%,#141311 100%);color:var(--paper)}
+.fcard.dark .tag{color:rgba(250,248,242,.6)}
+.fcard.dark .plus{background:var(--sun);color:var(--ink)}
+.fcard.white{background:#fff}
+.fnav{display:flex;gap:10px}
+.fnav button{width:44px;height:44px;border-radius:50%;border:0;background:rgba(27,26,23,.08);color:var(--ink);font-size:18px;cursor:pointer;transition:background .3s}
+.fnav button:hover:not(:disabled){background:rgba(27,26,23,.16)}
+.fnav button:disabled{opacity:.35;cursor:default}
+/* card scenes */
+.sc-ai{position:relative;width:200px;height:200px}
+.sc-ai .nb{position:absolute;inset:30px}
+.sc-ai .ln{position:absolute;left:50%;height:8px;border-radius:4px;background:rgba(250,248,242,.85);transform-origin:left;animation:brow 5s ease-in-out infinite}
+.sc-tools{display:grid;grid-template-columns:repeat(4,48px);gap:10px}
+.sc-tools span{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;box-shadow:0 10px 20px -12px rgba(27,26,23,.5);animation:pop 6s var(--ease) infinite both}
+.sc-widget{width:210px;background:#fff;border-radius:18px;padding:14px;box-shadow:0 24px 50px -30px rgba(27,26,23,.55);display:flex;flex-direction:column;gap:8px;font-size:12px}
+.sc-widget .hd{font-weight:600;font-size:13px}
+.sc-widget .opt{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#F6F4EF}
+.sc-widget .opt i{width:18px;height:18px;border-radius:6px;animation:accent 6s steps(1) infinite}
+.sc-widget .send{margin-top:2px;text-align:center;padding:8px;border-radius:10px;font-weight:600;animation:accent 6s steps(1) infinite}
+@keyframes accent{0%{background:#FFD666}33%{background:#B9DCFF}66%{background:#E3C6FF}}
+.sc-code{width:100%;border-radius:16px;background:#0E0D0C;color:#EDEAF5;padding:16px;font-family:var(--mono);font-size:11.5px;line-height:1.6;overflow:hidden;white-space:nowrap}
+.sc-code .k{color:var(--sun)}.sc-code .s{color:#C9B6FF}
+.sc-code .typed{display:inline-block;overflow:hidden;vertical-align:bottom;animation:type 5s steps(28) infinite}
+@keyframes type{0%{width:0}50%,90%{width:28ch}100%{width:28ch;opacity:0}}
+.sc-code .ok{display:block;margin-top:10px;color:#5BD08A;animation:pop 5s var(--ease) infinite both;animation-delay:2.6s}
+.sc-priv{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.sc-priv .pill{animation:pop 6s var(--ease) infinite both}
+
+/* Feature modal */
+.fmodal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.fmodal .scrim{position:absolute;inset:0;background:rgba(20,19,17,.5);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2)}
+.fpanel{position:relative;width:min(1100px,100%);max-height:calc(100vh - 48px);overflow:auto;overscroll-behavior:contain;background:var(--paper);border-radius:32px;box-shadow:0 60px 120px -40px rgba(0,0,0,.6);transform-origin:top left}
+.fpanel-in{padding:clamp(24px,4vw,56px);display:flex;flex-direction:column;gap:26px}
+.fpanel .xwrap{position:sticky;top:0;height:0;z-index:2}
+.fpanel .x{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:var(--paper);font-size:18px;cursor:pointer}
+.fpanel .x:hover{background:var(--sun);color:var(--ink)}
+.fpanel h2{font-size:clamp(34px,4vw,60px);line-height:1;letter-spacing:-.038em}
+.fpanel .lead{max-width:640px}
+.fpanel-in>*{animation:mIn .7s var(--ease) both}
+.fpanel-in>*:nth-child(2){animation-delay:.06s}.fpanel-in>*:nth-child(3){animation-delay:.12s}.fpanel-in>*:nth-child(4){animation-delay:.18s}.fpanel-in>*:nth-child(5){animation-delay:.24s}.fpanel-in>*:nth-child(6){animation-delay:.3s}
+@keyframes mIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.fnext{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:22px;border-top:1px solid rgba(27,26,23,.1)}
+.fnext button{display:inline-flex;align-items:center;gap:10px;border:0;background:none;font:inherit;font-weight:600;font-size:17px;color:var(--ink);cursor:pointer;padding:6px 0}
+.fnext button span{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--sun);transition:transform .4s var(--ease)}
+.fnext button:hover span{transform:translateX(4px)}
+body.locked{overflow:hidden}
+
+/* AI Powered (inside its modal) */
 .ai-pill{display:inline-flex;align-items:center;padding:8px 16px;border-radius:999px;background:var(--iris);font-weight:600;font-size:14px;color:var(--ink);width:max-content}
-.ai-panel{display:grid;grid-template-columns:minmax(0,.8fr) 140px minmax(0,1.2fr);gap:24px;align-items:center;padding:clamp(20px,2.6vw,34px);border-radius:32px;background:radial-gradient(70% 90% at 30% 20%,#3A3324 0%,#1F1D1A 60%,#141311 100%);color:var(--paper)}
+.ai-panel{display:grid;grid-template-columns:minmax(0,.8fr) 140px minmax(0,1.2fr);gap:24px;align-items:center;padding:clamp(20px,2.6vw,34px);border-radius:28px;background:radial-gradient(70% 90% at 30% 20%,#3A3324 0%,#1F1D1A 60%,#141311 100%);color:var(--paper)}
 .ai-in{display:flex;flex-direction:column;gap:10px}
 .ai-in .tag{color:rgba(250,248,242,.6);display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .ai-in .tag i{width:7px;height:7px;border-radius:50%;background:#5BD08A;box-shadow:0 0 0 3px rgba(91,208,138,.25)}
-.fchip{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:rgba(250,248,242,.92);color:var(--ink);font-size:14px}
+.fchip{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:rgba(250,248,242,.92);color:var(--ink);font-size:14px;animation:fly .9s cubic-bezier(.6,0,.4,1) both}
 .fchip i{width:22px;height:22px;border-radius:6px;flex:none}
 .fchip code{font-family:var(--mono);font-size:12px}
-.core{position:relative;width:140px;height:140px;display:grid;place-items:center}
+.fchip:nth-of-type(1){animation-delay:.9s}.fchip:nth-of-type(2){animation-delay:1.05s}.fchip:nth-of-type(3){animation-delay:1.2s}.fchip:nth-of-type(4){animation-delay:1.35s}.fchip:nth-of-type(5){animation-delay:1.5s}
+@keyframes fly{from{opacity:1;transform:none}to{opacity:.12;transform:translateX(120px) scale(.6)}}
+.core{position:relative;width:140px;height:140px;display:grid;place-items:center;animation:core 1.4s var(--ease) 1.2s both}
 .core .nb{position:absolute;inset:-10px}
 .core svg.ringsvg{position:absolute;inset:0;width:100%;height:100%;animation:spin 18s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes core{0%{transform:scale(.85);filter:saturate(.3)}50%{transform:scale(1.16)}100%{transform:scale(1);filter:none}}
 .core span{position:relative;font-weight:700;font-size:13px;color:var(--ink);text-align:center;line-height:1.1}
 .ai-out{background:#fff;color:var(--ink);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 40px 80px -40px rgba(0,0,0,.6)}
 .ai-out .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
@@ -259,42 +306,45 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .ai-out .meta{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:4px}
 .chip-s{display:inline-flex;padding:4px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
 .chip-red{background:#FDECEE;color:#A1121E}.chip-blue{background:#E6F0FF;color:#1F5BB8}
-.ans{border-radius:14px;padding:10px 14px;background:#F7F5F0}
+.ans{border-radius:14px;padding:10px 14px;background:#F7F5F0;animation:ans .7s var(--ease) both}
+.ans.a1{animation-delay:2s}.ans.a2{animation-delay:2.35s}.ans.a3{animation-delay:2.7s}.ans.a4{animation-delay:3.05s}
+@keyframes ans{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 .ans .k{font-family:var(--mono);font-size:11px;color:var(--sun-ink);text-transform:uppercase;letter-spacing:.06em}
 .ans p{margin-top:4px;font-size:14px;line-height:1.5;color:var(--ink)}
 .ans.cause{background:linear-gradient(120deg,#FFF6DA,#F3EAFF)}
-.ai-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:20px}
+.replay{align-self:flex-start;border:1px solid rgba(250,248,242,.25);background:none;color:var(--paper);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 .ichip{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;background:#fff;font-size:15px;letter-spacing:-.01em;transition:background .3s,color .3s,transform .3s}
 .ichip:hover{background:var(--sun);transform:translateY(-2px)}
 .ichip.dark{background:rgba(250,248,242,.07);color:var(--paper);border:1px solid rgba(250,248,242,.14)}
 .ichip.dark:hover{background:var(--sun);color:var(--ink)}
-.ichip.soft{background:var(--paper)}
-@media (max-width:980px){.ai-head{grid-template-columns:1fr}.ai-panel{grid-template-columns:1fr;justify-items:center}.ai-in,.ai-out{width:100%}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.note{font-size:15px;color:var(--ink-2)}
+.note b{color:var(--ink)}
+@media (max-width:860px){.ai-panel{grid-template-columns:minmax(0,1fr);justify-items:center}.ai-in,.ai-out{width:100%}.fchip{animation:none}}
 
-/* Lanes */
-.lanes{border-radius:24px;background:rgba(250,248,242,.03);border:1px solid var(--night-line);padding:6px 24px}
-.keeprow{position:relative;display:grid;grid-template-columns:180px minmax(0,1fr);gap:16px;align-items:center;padding:22px 0;border-top:1px solid var(--night-line)}
-.keeprow:first-child{border-top:0}
+/* Privacy (inside its modal) */
+.darkbox{border-radius:28px;background:var(--night);color:var(--paper);padding:clamp(20px,3vw,32px);display:flex;flex-direction:column;gap:16px}
+.darkbox .body{color:rgba(250,248,242,.68)}
+.keeprow{display:grid;grid-template-columns:170px minmax(0,1fr);gap:16px;align-items:center;padding:18px 0;border-top:1px solid var(--night-line)}
+.keeprow:first-child{border-top:0;padding-top:4px}
 .keeprow .who{display:flex;align-items:center;gap:8px;font-weight:500}
 .keeprow .who i{width:8px;height:8px;border-radius:50%}
 .pill{display:inline-block;white-space:nowrap;padding:8px 13px;border-radius:999px;font-size:14px;font-weight:500;letter-spacing:-.01em}
 .pill.u{background:var(--sun);color:var(--ink)}
-.pill.l{background:#2A2824;color:rgba(250,248,242,.7);border:1px solid rgba(250,248,242,.16)}
+.pill.l{background:#2A2824;color:rgba(250,248,242,.75);border:1px solid rgba(250,248,242,.16)}
 .pill.l s{text-decoration-color:rgba(229,72,77,.8);text-decoration-thickness:1.5px}
-@media (max-width:700px){.keeprow{grid-template-columns:minmax(0,1fr)}.pill{white-space:normal}}
-.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
-.trio>div{border-radius:24px;padding:28px;background:rgba(250,248,242,.04);border:1px solid var(--night-line);display:flex;flex-direction:column;gap:10px}
-.trio .d3{color:var(--paper)}
-@media (max-width:980px){.trio{grid-template-columns:minmax(0,1fr)}}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.trio>div{border-radius:22px;padding:24px;background:#fff;display:flex;flex-direction:column;gap:8px}
+@media (max-width:860px){.keeprow,.trio{grid-template-columns:minmax(0,1fr)}.pill{white-space:normal}}
 
-/* Integrations */
+/* Integrations (inside its modal) */
 .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.tri .tile{padding:28px;display:flex;flex-direction:column;gap:12px;min-height:500px}
-.tri .vis{height:200px;display:grid;place-items:center;margin-bottom:10px}
+.tri .tile{padding:24px;display:flex;flex-direction:column;gap:10px;border-radius:24px}
+.tri .vis{height:170px;display:grid;place-items:center}
 .tri .tag{display:inline-flex;width:max-content;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.7)}
 .bob{animation:bob 3.2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.tcard{width:250px;background:#fff;border-radius:16px;padding:14px;box-shadow:0 20px 40px -24px rgba(27,26,23,.4);display:flex;flex-direction:column;gap:9px;font-size:12.5px}
+.tcard{width:240px;background:#fff;border-radius:16px;padding:14px;box-shadow:0 20px 40px -24px rgba(27,26,23,.4);display:flex;flex-direction:column;gap:9px;font-size:12.5px}
 .tcard .h{display:flex;align-items:center;gap:8px;font-weight:600}
 .tcard .sync{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:400;color:var(--ink-3)}
 .tcard .ln{height:7px;border-radius:4px;background:#EFECE6}
@@ -305,48 +355,114 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .status .s2{background:#FFF1C4;color:#7A5300;animation-delay:2.5s}
 .status .s3{background:#E3F4E8;color:#1A7F37;animation-delay:5s}
 @keyframes stat{0%{opacity:0;transform:translateY(100%)}4%,30%{opacity:1;transform:none}34%,100%{opacity:0;transform:translateY(-100%)}}
-.bubbles{display:flex;flex-direction:column;gap:8px;width:270px}
+.bubbles{display:flex;flex-direction:column;gap:8px;width:260px}
 .bubble{max-width:85%;padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.4;animation:bubble 6s var(--ease) infinite both}
 .bubble.a{background:#fff;align-self:flex-start;border-bottom-left-radius:4px}
 .bubble.b{background:var(--ink);color:var(--paper);align-self:flex-end;border-bottom-right-radius:4px;animation-delay:.6s}
 .bubble.c{align-self:flex-end;background:#E3F4E8;color:#1A7F37;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;animation-delay:1.2s}
 @keyframes bubble{0%{opacity:0;transform:translateY(14px) scale(.92)}10%,85%{opacity:1;transform:none}95%,100%{opacity:0}}
-.blocks{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:260px}
+.blocks{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:250px}
 .block{border-radius:12px;padding:12px 14px;font-family:var(--mono);font-size:11.5px;background:#fff;animation:pop 4.8s var(--ease) infinite both}
 .block.hl{background:var(--ink);color:var(--paper);grid-column:span 2}
-.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:16px}
-.panel{border-radius:28px;padding:30px;display:flex;flex-direction:column;gap:18px}
-.panel .ph{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.panel.dark{background:var(--ink);color:var(--paper)}
-.panel.dark .tag{color:rgba(250,248,242,.6)}
-.snippet{border-radius:16px;background:#0E0D0C;padding:18px 20px;font-family:var(--mono);font-size:13.5px;line-height:1.6;color:#EDEAF5;overflow-x:auto;white-space:pre}
-.snippet .k{color:var(--sun)}.snippet .s{color:#C9B6FF}
-@media (max-width:980px){.tri,.duo{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){.tri{grid-template-columns:minmax(0,1fr)}}
 
-/* Support Center tiles */
-.sc-tile{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);background:#fff;border-radius:28px;overflow:hidden;min-height:400px}
-.sc-vis{position:relative;display:grid;place-items:center;padding:24px}
-.sc-body{padding:32px 30px;display:flex;flex-direction:column;gap:12px}
-.sc-role{color:var(--sun-ink);font-weight:500;font-size:16px}
-.kpis{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
-.kpi{border-radius:14px;border:1.5px dashed rgba(27,26,23,.18);padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
-.kpi b{display:block;font-family:var(--sans);font-size:18px;color:var(--ink);letter-spacing:-.02em}
-.reports{display:flex;flex-direction:column;gap:8px;width:100%;max-width:240px}
-.rep{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;font-size:12px;box-shadow:0 8px 20px -14px rgba(27,26,23,.4)}
-.rep .id{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
-.stack{position:relative;width:100%;max-width:240px;height:190px}
-.stack .card{position:absolute;left:0;right:0;padding:12px 14px;border-radius:14px;background:#fff;font-size:12px;box-shadow:0 10px 24px -16px rgba(27,26,23,.45)}
-.stack .c1{top:0;animation:m1 6s var(--ease) infinite}
-.stack .c2{top:52px;animation:m2 6s var(--ease) infinite}
-.stack .c3{top:104px;animation:m3 6s var(--ease) infinite}
-.stack .grp{top:52px;background:var(--ink);color:var(--paper);opacity:0;animation:grp 6s var(--ease) infinite}
-.stack .grp b{color:var(--sun)}
-@keyframes m1{0%,30%{transform:none;opacity:1}50%,88%{transform:translateY(52px) scale(.94);opacity:0}100%{opacity:1}}
-@keyframes m2{0%,30%{opacity:1}50%,88%{opacity:0}100%{opacity:1}}
-@keyframes m3{0%,30%{transform:none;opacity:1}50%,88%{transform:translateY(-52px) scale(.94);opacity:0}100%{opacity:1}}
-@keyframes grp{0%,40%{opacity:0;transform:scale(.9)}55%,88%{opacity:1;transform:none}100%{opacity:0}}
-@media (max-width:980px){.sc-tile{grid-template-columns:minmax(0,1fr)}}
+/* Customize + install (inside their modals) */
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.box{border-radius:24px;background:#fff;padding:24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.box h3{font-size:20px;letter-spacing:-.02em}
+.wdemo{--acc:#FFD666;display:flex;gap:20px;align-items:flex-end;justify-content:center;padding:24px;border-radius:20px;background:#F2EEE4}
+.wpanel{width:250px;background:#fff;border-radius:20px;padding:16px;box-shadow:0 30px 60px -30px rgba(27,26,23,.5);display:flex;flex-direction:column;gap:10px;font-size:13px}
+.wpanel .hd{font-weight:600;font-size:15px}
+.wpanel .sub{color:var(--ink-3);font-size:12px;margin-top:-6px}
+.wpanel .opt{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#F6F4EF}
+.wpanel .opt i{width:26px;height:26px;border-radius:8px;background:var(--acc);transition:background .4s}
+.wpanel .opt small{display:block;color:var(--ink-3);font-size:11px}
+.wpanel .send{padding:10px;border-radius:12px;background:var(--acc);text-align:center;font-weight:600;transition:background .4s}
+.wdot{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,#fff 0%,var(--acc) 45%,transparent 72%);transition:background .4s;flex:none}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatches button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(27,26,23,.15);cursor:pointer}
+.swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.tpl{border-radius:16px;background:#0E0D0C;color:#EDEAF5;padding:16px 18px;font-family:var(--mono);font-size:12.5px;line-height:1.7;white-space:pre;overflow-x:auto}
+.tpl .v{color:var(--sun)}.tpl .c{color:#8B877E}
+.snippet{border-radius:16px;background:#0E0D0C;padding:18px 20px;font-family:var(--mono);font-size:13px;line-height:1.6;color:#EDEAF5;overflow-x:auto;white-space:pre}
+.snippet .k{color:var(--sun)}.snippet .s{color:#C9B6FF}.snippet .c{color:#8B877E}
+.copy{align-self:flex-start;border:0;border-radius:999px;padding:8px 14px;background:var(--ink);color:var(--paper);font:inherit;font-size:14px;cursor:pointer}
+.wiz{display:flex;flex-direction:column;gap:10px}
+.wiz div{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:#F6F4EF;font-size:15px}
+.wiz i{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--sun);font-style:normal;font-size:13px;font-weight:700;animation:pop .6s var(--ease) both}
+.wiz div:nth-child(2) i{animation-delay:.5s}.wiz div:nth-child(3) i{animation-delay:1s}.wiz div:nth-child(4) i{animation-delay:1.5s}
+.wiz small{margin-left:auto;color:var(--ink-3);font-family:var(--mono);font-size:11px}
+@media (max-width:860px){.split{grid-template-columns:minmax(0,1fr)}}
+
+/* Support Center: a live dashboard */
+.scsec{padding:clamp(88px,10vw,130px) 0}
+.sc-top{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:32px;align-items:end;margin-bottom:clamp(36px,4vw,56px)}
+.sc-top .lead{max-width:520px}
+.sc-top .ctas{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.btn-ghost{border-color:rgba(250,248,242,.25);color:var(--paper);background:transparent;padding:0 24px}
+.btn-ghost:hover{border-color:var(--paper)}
+.dash{--d-bg:#1F1D1A;--d-card:#272521;--d-line:rgba(250,248,242,.08);--d-mute:rgba(250,248,242,.55);--s-rep:#bd8418;--s-res:#3987e5;
+  border-radius:24px;background:var(--d-bg);border:1px solid rgba(250,248,242,.1);box-shadow:0 60px 120px -50px rgba(255,214,102,.25),0 40px 80px -40px rgba(0,0,0,.7);overflow:hidden}
+.dbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--d-line)}
+.dbar i{width:11px;height:11px;border-radius:50%;background:rgba(250,248,242,.18)}
+.dbar span{margin-left:12px;font-family:var(--mono);font-size:12px;color:var(--d-mute);padding:4px 12px;border-radius:999px;background:rgba(250,248,242,.06)}
+.dgrid{display:grid;grid-template-columns:200px minmax(0,1fr)}
+.dside{border-right:1px solid var(--d-line);padding:18px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.dside .brand{font-size:16px;margin-bottom:12px}
+.dside .brand .mark{width:24px;height:24px}
+.dside .app{padding:8px 10px;border-radius:10px;background:rgba(250,248,242,.06);font-size:13px;margin-bottom:10px;display:flex;justify-content:space-between}
+.dside a{display:flex;justify-content:space-between;padding:8px 10px;border-radius:10px;color:rgba(250,248,242,.75);text-decoration:none}
+.dside a.on{background:rgba(255,214,102,.14);color:var(--sun)}
+.dside .plan{margin-top:auto;padding:12px;border-radius:12px;background:rgba(250,248,242,.05);font-size:12px;color:var(--d-mute)}
+.dside .plan b{display:block;color:var(--paper);font-size:13px}
+.dside .meter{height:5px;border-radius:3px;background:rgba(250,248,242,.1);margin-top:8px;overflow:hidden}
+.dside .meter i{display:block;height:100%;width:13%;background:var(--sun);border-radius:3px}
+.dmain{padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.dhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.dhead h3{font-size:22px;letter-spacing:-.02em}
+.dhead span{font-size:13px;color:var(--d-mute)}
+.kpis4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi4{background:var(--d-card);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi4 .l{font-size:12.5px;color:var(--d-mute)}
+.kpi4 b{font-size:clamp(24px,2.2vw,32px);font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.kpi4 .d{font-size:12px;color:var(--d-mute)}
+.kpi4 .d em{font-style:normal;color:#5BD08A}
+.kpi4 svg{height:26px;width:100%;margin-top:2px}
+.drow{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:12px}
+.dcard{background:var(--d-card);border-radius:16px;padding:16px;min-width:0}
+.dcard .t{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font-weight:600;font-size:14px}
+.legend{display:flex;gap:14px;font-weight:400;font-size:12px;color:var(--d-mute)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:2px;border-radius:1px}
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;height:220px;overflow:visible}
+.chartbox .tip{position:absolute;top:0;pointer-events:none;background:#0E0D0C;border:1px solid rgba(250,248,242,.12);border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.5;white-space:nowrap;opacity:0;transition:opacity .15s;transform:translateX(-50%)}
+.chartbox .tip b{display:block;font-weight:600;margin-bottom:2px}
+.chartbox .tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.draw-line{stroke-dasharray:1;stroke-dashoffset:1}
+.dash.seen .draw-line{animation:dashin 1.8s cubic-bezier(.65,0,.35,1) .2s forwards}
+.dash.seen .draw-line.b{animation-delay:.45s}
+.dash.seen .area{animation:fadeA 1s ease-out 1.4s both}
+@keyframes fadeA{from{opacity:0}to{opacity:1}}
+.issues{display:flex;flex-direction:column;gap:12px}
+.issue .row{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.issue .row span:last-child{color:var(--d-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.issue .bar{height:6px;border-radius:3px;background:rgba(250,248,242,.08);margin-top:6px;overflow:hidden}
+.issue .bar i{display:block;height:100%;border-radius:3px;background:var(--sun);transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+.dash.seen .issue .bar i{transform:scaleX(1)}
+.issue .meta{font-family:var(--mono);font-size:11px;color:var(--d-mute);margin-top:4px}
+.feed{display:flex;flex-direction:column}
+.feed .r{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--d-line);font-size:13px}
+.feed .r:first-child{border-top:0;padding-top:0}
+.feed .lg{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:#fff;font-size:10px;font-weight:700}
+.feed .id{display:block;font-family:var(--mono);font-size:11px;color:var(--d-mute)}
+.feed .new{animation:feedIn 9s var(--ease) infinite}
+@keyframes feedIn{0%,8%{opacity:0;transform:translateY(-8px)}14%,100%{opacity:1;transform:none}}
+.sc-points{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
+.sc-points>div{border-radius:22px;padding:24px;background:rgba(250,248,242,.04);border:1px solid var(--night-line);display:flex;flex-direction:column;gap:8px}
+.sc-points h3{font-size:20px;letter-spacing:-.02em}
+.sc-points p{font-size:15px;line-height:1.5;color:rgba(250,248,242,.68)}
+@media (max-width:980px){.sc-top{grid-template-columns:minmax(0,1fr)}.dgrid{grid-template-columns:minmax(0,1fr)}.dside{display:none}.kpis4{grid-template-columns:repeat(2,minmax(0,1fr))}.drow,.sc-points{grid-template-columns:minmax(0,1fr)}}
 
 /* Pricing */
 .price-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
@@ -425,9 +541,8 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       <a class="brand" href="#top"><span class="mark" data-nebula="low"></span>Lumora</a>
       <div class="navlinks">
         <a class="navlink" href="#how">How it works</a>
-        <a class="navlink" href="#ai">AI Powered</a>
-        <a class="navlink" href="#privacy">Privacy</a>
-        <a class="navlink" href="#integrations">Integrations</a>
+        <a class="navlink" href="#features">Features</a>
+        <a class="navlink" href="#support-center">Support Center</a>
         <a class="navlink" href="#pricing">Pricing</a>
       </div>
       <div class="navright">
@@ -483,7 +598,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       <div class="wrap"><div class="hhead">
         <span class="eyebrow">How it works</span>
         <h2 class="d2">Stop asking users for <span class="squiggle view">screenshots.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></h2>
-        <p class="lead" style="max-width:600px">Which browser are you on? What did you click? Can you send a screenshot? Most bug reports start with a round of questions. With Lumora, the answers arrive with the report.</p>
+        <p class="lead" style="max-width:620px">Which browser are you on? What did you click? Can you send a screenshot? Most bug reports start with a round of questions. Lumora is a widget you add to your app, and with it the answers arrive with the report.</p>
       </div></div>
       <div class="wrap" style="max-width:none;padding-right:0">
         <div class="htrack">
@@ -493,8 +608,8 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
               <span class="cursor"><svg viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z"/></svg></span>
             </div>
             <div class="num"><b>01</b><span class="tag">Your user</span></div>
-            <h3 class="d3">Click the nebula</h3>
-            <p>A small glowing button sits in the corner of your app. It pulses when the page throws an error, so people notice it at the right moment.</p>
+            <h3 class="d3">Open the widget</h3>
+            <p>The Lumora widget is a small glowing nebula in the corner of your app. It pulses when the page throws an error, so people notice it at the right moment.</p>
             <ul class="gain"><li>Reports from users who would never open a ticket</li><li>Errors noticed as they happen</li><li>Your colors, English or Spanish</li></ul>
           </article>
           <article class="hcard">
@@ -546,184 +661,298 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
 
   <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 0 L1440 0 L1440 30 C1360 46 1280 22 1180 38 C1080 54 990 24 890 40 C790 56 700 26 600 42 C500 58 410 28 310 44 C210 58 120 30 0 46 Z" fill="#141311"/></svg>
 
-  <!-- AI Powered: pinned -->
-  <section class="aisec" id="ai">
-    <div class="aipin">
-      <div class="wrap" style="width:100%">
-        <div class="ai-head">
-          <div style="display:flex;flex-direction:column;gap:20px">
-            <span class="ai-pill">AI Powered</span>
-            <h2 class="d2">The ticket explains itself.</h2>
-          </div>
-          <p class="lead">AI Powered listens to the user’s voice note, reads the console and network logs, and drafts the ticket for you: a summary, what they expected and what happened, a suggested priority and the likely cause. It writes in your team’s language, whichever language the user spoke.</p>
+  <!-- Features: one row of cards, each opens a modal with the detail -->
+  <section class="sec" id="features" style="overflow:hidden">
+    <div class="wrap">
+      <div class="feat-head">
+        <div>
+          <span class="eyebrow">Features</span>
+          <h2 class="d2">There’s more behind the button.</h2>
         </div>
-        <div class="ai-panel">
-          <div class="ai-in">
-            <span class="tag"><i></i>New report from app.globex.com</span>
-            <span class="fchip"><i style="background:#FDECEE"></i>recording.webm · 0:42</span>
-            <span class="fchip"><i style="background:#F0E6FF"></i>“I change the country and it won’t save…”</span>
-            <span class="fchip"><i style="background:#FFF1C4"></i><code>ValidationError: VAT number…</code></span>
-            <span class="fchip"><i style="background:#E4F0FF"></i><code>POST /api/billing → 422</code></span>
-            <span class="fchip"><i style="background:#E3F4E8"></i>screenshot.png</span>
-          </div>
-          <div class="core" aria-hidden="true">
-            <span class="nb" data-nebula></span>
-            <svg class="ringsvg" viewBox="0 0 140 140"><circle cx="70" cy="70" r="66" fill="none" stroke="rgba(250,248,242,.35)" stroke-width="1.5" stroke-dasharray="2 6"/><circle cx="70" cy="4" r="3.5" fill="#FFD666"/></svg>
-            <span>AI<br>Powered</span>
-          </div>
-          <div class="ai-out">
-            <div class="top">
-              <div><div class="title">[Bug] Saving billing details fails with a VAT error</div><div class="meta">FUN-52 · Billing · 25 min ago</div></div>
-              <span class="chip-s chip-red">Priority · High</span>
-            </div>
-            <div class="ans a1"><span class="k">Summary</span><p>Customers in Mexico can’t save billing details: the form asks for a VAT number Mexico doesn’t use.</p></div>
-            <div class="ans a2"><span class="k">Expected vs. what happened</span><p>Expected the details to save. Nothing was saved and the console shows “VAT number is required”.</p></div>
-            <div class="ans cause a3"><span class="k">Likely cause</span><p>The validator requires a VAT number for every country instead of only EU ones.</p></div>
-            <div class="ans a4"><span class="k">Possible duplicate</span><p>FUN-42, reported by 3 people this week. Example data.</p></div>
-          </div>
-        </div>
-        <div class="ai-foot">
-          <span class="body" style="margin-right:6px">AI Powered also adds</span>
-          <span class="ichip">Voice transcripts</span><span class="ichip">Clearer steps</span><span class="ichip">Suggested category</span><span class="ichip">Duplicate detection</span><span class="ichip">Translation</span>
+        <div class="fnav" aria-label="Scroll features">
+          <button type="button" id="fPrev" aria-label="Previous">←</button>
+          <button type="button" id="fNext" aria-label="Next">→</button>
         </div>
       </div>
     </div>
-  </section>
-
-  <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 46 C90 30 150 58 250 40 C340 24 420 52 520 36 C610 22 700 56 800 38 C900 20 990 50 1090 34 C1180 20 1260 48 1340 32 C1390 24 1420 30 1440 28 L1440 72 L0 72 Z" fill="#141311"/></svg>
-
-  <!-- Privacy: what is always attached and what never leaves the browser -->
-  <section class="sec night on-night" id="privacy">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow">Privacy and security</span>
-        <h2 class="d2">Complete reports, without the sensitive data.</h2>
-        <p class="lead">Technical details are always attached, and private data is removed in the user’s browser before anything is sent.</p>
-      </div>
-      <div class="lanes reveal">
-        <div class="keeprow">
-          <div class="who"><i style="background:var(--sun)"></i>Always attached</div>
-          <div class="chips"><span class="pill u">Console errors</span><span class="pill u">Failed requests</span><span class="pill u">The user’s last steps</span><span class="pill u">Browser, OS and screen</span><span class="pill u">User ID and plan</span></div>
-        </div>
-        <div class="keeprow">
-          <div class="who"><i style="background:#E5484D"></i>Never sent</div>
-          <div class="chips"><span class="pill l"><s>What users type</s></span><span class="pill l"><s>Passwords and card numbers</s></span><span class="pill l"><s>Request bodies and headers</s></span><span class="pill l"><s>E-mails and tokens in logs</s></span><span class="pill l"><s>Elements you choose to hide</s></span></div>
-        </div>
-      </div>
-      <div class="trio">
-        <div class="reveal"><h3 class="d3">Masked inputs</h3><p class="body">Steps say which field was used, never what was typed. Password and card fields are always hidden in screenshots and recordings.</p></div>
-        <div class="reveal"><h3 class="d3">Cleaned in the browser</h3><p class="body">E-mail addresses, card numbers and tokens are removed from logs and URLs before the report leaves the page.</p></div>
-        <div class="reveal"><h3 class="d3">Stored safely</h3><p class="body">Integration credentials are encrypted, each widget key only works on your domains, and attachment links expire.</p></div>
-      </div>
+    <div class="ftrack" id="ftrack">
+      <button type="button" class="fcard dark" data-feature="ai">
+        <span class="ai-pill" style="font-size:13px;padding:6px 12px">AI Powered</span>
+        <h3>The ticket explains itself.</h3>
+        <span class="fscene" aria-hidden="true"><span class="sc-ai"><span class="nb" data-nebula></span></span></span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
+      <button type="button" class="fcard bg-sky" data-feature="tools">
+        <span class="tag">Integrations</span>
+        <h3>Tickets land where your team already works.</h3>
+        <span class="fscene" aria-hidden="true"><span class="sc-tools">
+          <span style="background:#2684FF">Ji</span><span style="background:#24292F;animation-delay:.15s">GH</span><span style="background:#03363D;animation-delay:.3s">Ze</span><span style="background:#5E6AD2;animation-delay:.45s">Li</span>
+          <span style="background:#0078D4;animation-delay:.6s">Az</span><span style="background:#4A154B;animation-delay:.75s">Sl</span><span style="background:#00A1E0;animation-delay:.9s">SF</span><span style="background:#62D84E;animation-delay:1.05s">SN</span>
+        </span></span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
+      <button type="button" class="fcard bg-butter" data-feature="custom">
+        <span class="tag">Your brand</span>
+        <h3>A widget that looks like part of your app.</h3>
+        <span class="fscene" aria-hidden="true"><span class="sc-widget"><span class="hd">Something not working?</span><span class="opt"><i></i>Take a screenshot</span><span class="opt"><i></i>Record my screen</span><span class="send">Send report</span></span></span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
+      <button type="button" class="fcard white" data-feature="install">
+        <span class="tag">Setup</span>
+        <h3>One line of code. Ten minutes to your first ticket.</h3>
+        <span class="fscene" aria-hidden="true"><span class="sc-code"><span class="k">&lt;script</span> <span class="typed">src=<span class="s">"…/lumora.js"</span> async&gt;</span><span class="ok">✓ Lumora is live on app.globex.com</span></span></span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
+      <button type="button" class="fcard bg-lilac" data-feature="privacy">
+        <span class="tag">Privacy</span>
+        <h3>Complete reports, without the sensitive data.</h3>
+        <span class="fscene" aria-hidden="true"><span class="sc-priv">
+          <span class="pill u">Console errors</span><span class="pill u" style="animation-delay:.2s">Failed requests</span>
+          <span class="pill" style="background:var(--ink);color:var(--paper);animation-delay:.4s"><s>Passwords</s></span><span class="pill" style="background:var(--ink);color:var(--paper);animation-delay:.6s"><s>What users type</s></span>
+        </span></span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
     </div>
   </section>
 
-  <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 0 L1440 0 L1440 30 C1360 46 1280 22 1180 38 C1080 54 990 24 890 40 C790 56 700 26 600 42 C500 58 410 28 310 44 C210 58 120 30 0 46 Z" fill="#141311"/></svg>
-
-  <!-- Integrations -->
-  <section class="sec" id="integrations">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow">Your tools</span>
-        <h2 class="d2">Tickets land where your team already works.</h2>
-        <p class="lead">Choose your tool and Lumora creates the ticket there, formatted the way that tool expects, with the screenshot and recording attached. Most tools also send status changes back.</p>
+  <template id="t-ai">
+    <span class="ai-pill">AI Powered</span>
+    <h2>The ticket explains itself.</h2>
+    <p class="lead">AI Powered listens to the user’s voice note, reads the console and network logs, and drafts the ticket for you: a summary, what they expected and what happened, a suggested priority and the likely cause. It writes in your team’s language, whichever language the user spoke.</p>
+    <div class="ai-panel">
+      <div class="ai-in">
+        <span class="tag"><i></i>New report from app.globex.com</span>
+        <span class="fchip"><i style="background:#FDECEE"></i>recording.webm · 0:42</span>
+        <span class="fchip"><i style="background:#F0E6FF"></i>“I change the country and it won’t save…”</span>
+        <span class="fchip"><i style="background:#FFF1C4"></i><code>ValidationError: VAT number…</code></span>
+        <span class="fchip"><i style="background:#E4F0FF"></i><code>POST /api/billing → 422</code></span>
+        <span class="fchip"><i style="background:#E3F4E8"></i>screenshot.png</span>
+        <button type="button" class="replay" data-replay>↻ Replay</button>
       </div>
-      <div class="tri">
-        <article class="tile bg-sky reveal">
-          <div class="vis"><div class="tcard bob">
-            <div class="h"><span class="tk-logo" style="width:22px;height:22px;border-radius:6px;background:#2684FF;color:#fff;display:grid;place-items:center;font-size:10px">Ji</span>FUN-52<span class="sync">⟳ syncs status</span></div>
-            <div class="ln" style="width:90%"></div><div class="ln" style="width:65%"></div>
-            <div class="st"><span class="status"><span class="s1">Open</span><span class="s2">In review</span><span class="s3">Resolved</span></span><span class="chip-s" style="background:#F4F2EE;color:var(--ink-2)">📎 recording</span></div>
-          </div></div>
-          <span class="tag">Issue &amp; defect trackers</span>
-          <h3 class="d3">Jira, GitHub, Azure DevOps and 7 more</h3>
-          <p class="body">Also Linear, GitLab, ClickUp, Asana, Shortcut, YouTrack and Trello. Bugs go to the right project with everything attached.</p>
-        </article>
-        <article class="tile bg-butter reveal">
-          <div class="vis"><div class="bubbles">
-            <span class="bubble a">The Save button does nothing.</span>
-            <span class="bubble b">Thanks, we have everything we need. A fix is on the way.</span>
-            <span class="bubble c">Solved without a call</span>
-          </div></div>
-          <span class="tag">Help desks</span>
-          <h3 class="d3">Zendesk, Freshdesk and HubSpot</h3>
-          <p class="body">Agents see the screenshot, steps and console logs inside the ticket they are already working on.</p>
-        </article>
-        <article class="tile bg-lilac reveal">
-          <div class="vis"><div class="blocks">
-            <span class="block hl" style="animation-delay:0s">Case · CS-1048</span>
-            <span class="block" style="animation-delay:.2s">Steps ✓</span>
-            <span class="block" style="animation-delay:.4s">Console ✓</span>
-            <span class="block" style="animation-delay:.6s">Recording ✓</span>
-            <span class="block" style="animation-delay:.8s">Status ⇄</span>
-          </div></div>
-          <span class="tag">Enterprise service management</span>
-          <h3 class="d3">Salesforce, ServiceNow and Freshservice</h3>
-          <p class="body">Cases and incidents with the full report attached, for support teams that run on these platforms.</p>
-        </article>
+      <div class="core" aria-hidden="true">
+        <span class="nb" data-nebula></span>
+        <svg class="ringsvg" viewBox="0 0 140 140"><circle cx="70" cy="70" r="66" fill="none" stroke="rgba(250,248,242,.35)" stroke-width="1.5" stroke-dasharray="2 6"/><circle cx="70" cy="4" r="3.5" fill="#FFD666"/></svg>
+        <span>AI<br>Powered</span>
       </div>
-      <div class="duo">
-        <div class="panel reveal" style="background:#fff">
-          <div class="ph"><h3 class="d3">All 19 destinations</h3><span class="tag">Status syncs from 16 of them</span></div>
-          <div class="chips">
-            <span class="ichip soft">Jira</span><span class="ichip soft">Azure DevOps</span><span class="ichip soft">GitHub</span><span class="ichip soft">GitLab</span><span class="ichip soft">Linear</span><span class="ichip soft">ClickUp</span><span class="ichip soft">Asana</span><span class="ichip soft">Shortcut</span><span class="ichip soft">YouTrack</span><span class="ichip soft">Trello</span><span class="ichip soft">Zendesk</span><span class="ichip soft">Freshdesk</span><span class="ichip soft">HubSpot</span><span class="ichip soft">Salesforce</span><span class="ichip soft">ServiceNow</span><span class="ichip soft">Freshservice</span><span class="ichip soft">Slack</span><span class="ichip soft">E-mail</span><span class="ichip soft">Webhooks</span>
-          </div>
+      <div class="ai-out">
+        <div class="top">
+          <div><div class="title">[Bug] Saving billing details fails with a VAT error</div><div class="meta">FUN-52 · Billing · 25 min ago</div></div>
+          <span class="chip-s chip-red">Priority · High</span>
         </div>
-        <div class="panel dark reveal">
-          <div class="ph"><h3 class="d3">One line. Any web app.</h3><span class="tag">Install</span></div>
-<div class="snippet"><span class="k">&lt;script</span> src=<span class="s">"https://app.lumora.app/lumora.js"</span>
+        <div class="ans a1"><span class="k">Summary</span><p>Customers in Mexico can’t save billing details: the form asks for a VAT number Mexico doesn’t use.</p></div>
+        <div class="ans a2"><span class="k">Expected vs. what happened</span><p>Expected the details to save. Nothing was saved and the console shows “VAT number is required”.</p></div>
+        <div class="ans cause a3"><span class="k">Likely cause</span><p>The validator requires a VAT number for every country instead of only EU ones.</p></div>
+        <div class="ans a4"><span class="k">Possible duplicate</span><p>FUN-42, reported by 3 people this week. Example data.</p></div>
+      </div>
+    </div>
+    <div class="chips"><span class="note" style="margin-right:6px">Also adds</span><span class="ichip">Voice transcripts</span><span class="ichip">Clearer steps</span><span class="ichip">Suggested category</span><span class="ichip">Duplicate detection</span><span class="ichip">Translation</span></div>
+    <p class="note"><b>Included in Business.</b> On Pro it’s a $29 a month add-on with 500 AI reports.</p>
+  </template>
+
+  <template id="t-tools">
+    <span class="eyebrow">Integrations</span>
+    <h2>Tickets land where your team already works.</h2>
+    <p class="lead">Choose your tool and Lumora creates the ticket there, formatted the way that tool expects, with the screenshot and recording attached. Most tools also send status changes back.</p>
+    <div class="tri">
+      <article class="tile bg-sky">
+        <div class="vis"><div class="tcard bob">
+          <div class="h"><span style="width:22px;height:22px;border-radius:6px;background:#2684FF;color:#fff;display:grid;place-items:center;font-size:10px">Ji</span>FUN-52<span class="sync">⟳ syncs status</span></div>
+          <div class="ln" style="width:90%"></div><div class="ln" style="width:65%"></div>
+          <div class="st"><span class="status"><span class="s1">Open</span><span class="s2">In review</span><span class="s3">Resolved</span></span><span class="chip-s" style="background:#F4F2EE;color:var(--ink-2)">📎 recording</span></div>
+        </div></div>
+        <span class="tag">Issue &amp; defect trackers</span>
+        <h3 class="d3">Jira, GitHub, Azure DevOps and 7 more</h3>
+        <p class="body">Also Linear, GitLab, ClickUp, Asana, Shortcut, YouTrack and Trello. Bugs go to the right project with everything attached.</p>
+      </article>
+      <article class="tile bg-butter">
+        <div class="vis"><div class="bubbles">
+          <span class="bubble a">The Save button does nothing.</span>
+          <span class="bubble b">Thanks, we have everything we need. A fix is on the way.</span>
+          <span class="bubble c">Solved without a call</span>
+        </div></div>
+        <span class="tag">Help desks</span>
+        <h3 class="d3">Zendesk, Freshdesk and HubSpot</h3>
+        <p class="body">Agents see the screenshot, steps and console logs inside the ticket they are already working on.</p>
+      </article>
+      <article class="tile bg-lilac">
+        <div class="vis"><div class="blocks">
+          <span class="block hl">Case · CS-1048</span><span class="block" style="animation-delay:.2s">Steps ✓</span><span class="block" style="animation-delay:.4s">Console ✓</span><span class="block" style="animation-delay:.6s">Recording ✓</span><span class="block" style="animation-delay:.8s">Status ⇄</span>
+        </div></div>
+        <span class="tag">Enterprise service management</span>
+        <h3 class="d3">Salesforce, ServiceNow and Freshservice</h3>
+        <p class="body">Cases and incidents with the full report attached, for support teams that run on these platforms.</p>
+      </article>
+    </div>
+    <div class="chips">
+      <span class="ichip">Jira</span><span class="ichip">Azure DevOps</span><span class="ichip">GitHub</span><span class="ichip">GitLab</span><span class="ichip">Linear</span><span class="ichip">ClickUp</span><span class="ichip">Asana</span><span class="ichip">Shortcut</span><span class="ichip">YouTrack</span><span class="ichip">Trello</span><span class="ichip">Zendesk</span><span class="ichip">Freshdesk</span><span class="ichip">HubSpot</span><span class="ichip">Salesforce</span><span class="ichip">ServiceNow</span><span class="ichip">Freshservice</span><span class="ichip">Slack</span><span class="ichip">E-mail</span><span class="ichip">Webhooks</span>
+    </div>
+    <p class="note"><b>19 destinations,</b> 16 of them send status changes back to Lumora.</p>
+  </template>
+
+  <template id="t-custom">
+    <span class="eyebrow">Your brand</span>
+    <h2>A widget that looks like part of your app.</h2>
+    <p class="lead">Pick the color, the position and the language, choose the fields people fill in, and decide exactly how the ticket reads in your tool.</p>
+    <div class="split">
+      <div class="box">
+        <h3>Try a color</h3>
+        <div class="wdemo" id="wdemo">
+          <div class="wpanel">
+            <span class="hd">Something not working?</span>
+            <span class="sub">Show us what happened. We’ll take care of the technical details.</span>
+            <span class="opt"><i></i><span>Take a screenshot<small>Capture and mark up this page</small></span></span>
+            <span class="opt"><i></i><span>Record my screen<small>We’ll write the steps down</small></span></span>
+            <span class="send">Send report</span>
+          </div>
+          <span class="wdot"></span>
+        </div>
+        <div class="swatches" role="group" aria-label="Widget color">
+          <button type="button" aria-pressed="true" aria-label="Lumora yellow" style="background:#FFD666" data-acc="#FFD666"></button>
+          <button type="button" aria-pressed="false" aria-label="Sky" style="background:#B9DCFF" data-acc="#B9DCFF"></button>
+          <button type="button" aria-pressed="false" aria-label="Lilac" style="background:#E3C6FF" data-acc="#E3C6FF"></button>
+          <button type="button" aria-pressed="false" aria-label="Mint" style="background:#BDEBCB" data-acc="#BDEBCB"></button>
+          <button type="button" aria-pressed="false" aria-label="Peach" style="background:#FFC7A6" data-acc="#FFC7A6"></button>
+        </div>
+        <p class="note">Light or dark, English or Spanish, any corner of the screen. Pro and Business remove “Powered by Lumora”.</p>
+      </div>
+      <div class="box">
+        <h3>Your ticket template</h3>
+<div class="tpl"><span class="c">## What happened</span>
+<span class="v">{{description}}</span>
+
+<span class="c">## Steps to reproduce</span>
+<span class="v">{{steps}}</span>
+
+<span class="c">## Console</span>
+<span class="v">{{console}}</span>
+
+Reported by <span class="v">{{user.email}}</span> on <span class="v">{{page.url}}</span>
+Category: <span class="v">{{fields.category}}</span></div>
+        <p class="note">Write it once in Markdown. Lumora converts it for each tool and drops empty sections on its own.</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="t-install">
+    <span class="eyebrow">Setup</span>
+    <h2>One line of code. Ten minutes to your first ticket.</h2>
+    <p class="lead">Paste the snippet into any web app. A short setup guide walks you through the rest, and checks each step as you go.</p>
+    <div class="split">
+      <div class="box">
+        <h3>Install</h3>
+<div class="snippet" id="snip"><span class="k">&lt;script</span> src=<span class="s">"https://app.lumora.app/lumora.js"</span>
         data-key=<span class="s">"pk_live_…"</span> async<span class="k">&gt;&lt;/script&gt;</span></div>
-          <div class="chips">
-            <span class="ichip dark">React</span><span class="ichip dark">Next.js</span><span class="ichip dark">Vue</span><span class="ichip dark">Angular</span><span class="ichip dark">WordPress</span><span class="ichip dark">Shopify</span><span class="ichip dark">Webflow</span><span class="ichip dark">Google Tag Manager</span><span class="ichip dark">Salesforce Experience Cloud</span>
+        <button type="button" class="copy" data-copy="snip">Copy snippet</button>
+<div class="snippet"><span class="c">// Optional: tell Lumora who the user is</span>
+Lumora(<span class="s">'identify'</span>, { id, email, plan })</div>
+        <div class="chips"><span class="ichip" style="background:#F2EEE4">React</span><span class="ichip" style="background:#F2EEE4">Next.js</span><span class="ichip" style="background:#F2EEE4">Vue</span><span class="ichip" style="background:#F2EEE4">Angular</span><span class="ichip" style="background:#F2EEE4">WordPress</span><span class="ichip" style="background:#F2EEE4">Shopify</span><span class="ichip" style="background:#F2EEE4">Webflow</span><span class="ichip" style="background:#F2EEE4">Google Tag Manager</span><span class="ichip" style="background:#F2EEE4">Salesforce Experience Cloud</span></div>
+      </div>
+      <div class="box">
+        <h3>The setup guide</h3>
+        <div class="wiz">
+          <div><i>✓</i>Name your app and its domain<small>30 s</small></div>
+          <div><i>✓</i>Paste the snippet, Lumora sees it go live<small>2 min</small></div>
+          <div><i>✓</i>Connect Jira or GitHub, tested on save<small>4 min</small></div>
+          <div><i>✓</i>Send a test report and watch it land<small>1 min</small></div>
+        </div>
+        <p class="note">After that, a short tour shows you around, and every integration has its own step-by-step help.</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="t-privacy">
+    <span class="eyebrow">Privacy and security</span>
+    <h2>Complete reports, without the sensitive data.</h2>
+    <p class="lead">Technical details are always attached, and private data is removed in the user’s browser before anything is sent.</p>
+    <div class="darkbox">
+      <div class="keeprow"><div class="who"><i style="background:var(--sun)"></i>Always attached</div><div class="chips"><span class="pill u">Console errors</span><span class="pill u">Failed requests</span><span class="pill u">The user’s last steps</span><span class="pill u">Browser, OS and screen</span><span class="pill u">User ID and plan</span></div></div>
+      <div class="keeprow"><div class="who"><i style="background:#E5484D"></i>Never sent</div><div class="chips"><span class="pill l"><s>What users type</s></span><span class="pill l"><s>Passwords and card numbers</s></span><span class="pill l"><s>Request bodies and headers</s></span><span class="pill l"><s>E-mails and tokens in logs</s></span><span class="pill l"><s>Elements you choose to hide</s></span></div></div>
+    </div>
+    <div class="trio">
+      <div><h3 class="d3">Masked inputs</h3><p class="body">Steps say which field was used, never what was typed. Password and card fields are always hidden.</p></div>
+      <div><h3 class="d3">Cleaned in the browser</h3><p class="body">E-mail addresses, card numbers and tokens are removed from logs and URLs before the report leaves the page.</p></div>
+      <div><h3 class="d3">Stored safely</h3><p class="body">Integration credentials are encrypted, each widget key only works on your domains, and attachment links expire.</p></div>
+    </div>
+  </template>
+
+  <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 46 C90 30 150 58 250 40 C340 24 420 52 520 36 C610 22 700 56 800 38 C900 20 990 50 1090 34 C1180 20 1260 48 1340 32 C1390 24 1420 30 1440 28 L1440 72 L0 72 Z" fill="#141311"/><path d="M0 58 C140 50 260 66 400 54 C560 42 700 64 860 52 C1020 42 1180 62 1440 50 L1440 72 L0 72 Z" fill="#141311"/></svg>
+
+  <!-- Support Center: the Business plan, shown as a live dashboard -->
+  <section class="scsec night on-night" id="support-center">
+    <div class="wrap">
+      <div class="sc-top">
+        <div class="reveal" style="display:flex;flex-direction:column;gap:22px">
+          <span class="eyebrow">Support Center · Business</span>
+          <h2 class="d2">More than a widget. Your whole <span class="squiggle view">support center.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></h2>
+        </div>
+        <div class="reveal">
+          <p class="lead">Every report from every app in one place. See the live status of each ticket, which problems affect the most people, and how fast your team is closing them.</p>
+          <div class="ctas">
+            <a class="btn btn-sun" href="#start">Try Business free <span class="arrow">→</span></a>
+            <a class="btn btn-ghost" href="#pricing">Compare plans</a>
           </div>
         </div>
+      </div>
+      <div class="dash reveal" id="dash">
+        <div class="dbar"><i></i><i></i><i></i><span>app.lumora.app/overview</span></div>
+        <div class="dgrid">
+          <aside class="dside">
+            <span class="brand"><span class="mark" data-nebula="low"></span>Lumora</span>
+            <span class="app">Globex Billing <span>▾</span></span>
+            <a class="on">Overview</a><a>Reports <span>1,284</span></a><a>Issues <span>46</span></a><a>Settings</a>
+            <div class="plan"><b>Business</b>1,284 of 10,000 reports<div class="meter"><i></i></div></div>
+          </aside>
+          <div class="dmain">
+            <div class="dhead"><h3>Overview</h3><span>Last 30 days · 4 apps</span></div>
+            <div class="kpis4">
+              <div class="kpi4"><span class="l">Reports</span><b data-count="1284">1,284</b><span class="d"><em>+12%</em> vs previous 30 days</span><svg viewBox="0 0 100 26" preserveAspectRatio="none" id="spark1"></svg></div>
+              <div class="kpi4"><span class="l">Open now</span><b data-count="37">37</b><span class="d">14 in progress</span><svg viewBox="0 0 100 26" preserveAspectRatio="none" id="spark2"></svg></div>
+              <div class="kpi4"><span class="l">Median time to resolve</span><b data-count="18" data-suffix=" h">18 h</b><span class="d"><em>−6 h</em> vs previous 30 days</span><svg viewBox="0 0 100 26" preserveAspectRatio="none" id="spark3"></svg></div>
+              <div class="kpi4"><span class="l">People affected</span><b data-count="412">412</b><span class="d">across 46 issues</span><svg viewBox="0 0 100 26" preserveAspectRatio="none" id="spark4"></svg></div>
+            </div>
+            <div class="drow">
+              <div class="dcard">
+                <div class="t">Reports and resolutions<span class="legend"><span><i style="background:var(--s-rep)"></i>Reports</span><span><i style="background:var(--s-res)"></i>Resolved</span></span></div>
+                <div class="chartbox" id="chartbox"><svg id="chart" role="img" aria-label="Daily reports and resolved reports over the last 30 days"></svg><div class="tip" id="tip"></div></div>
+              </div>
+              <div class="dcard">
+                <div class="t">Top issues<span class="legend">people affected</span></div>
+                <div class="issues">
+                  <div class="issue"><div class="row"><span>VAT error when saving billing</span><span>128</span></div><div class="bar"><i style="width:100%"></i></div><div class="meta">grouped from 214 reports · Jira FUN-52</div></div>
+                  <div class="issue"><div class="row"><span>Export shows a blank PDF</span><span>74</span></div><div class="bar"><i style="width:58%"></i></div><div class="meta">grouped from 96 reports · GitHub #318</div></div>
+                  <div class="issue"><div class="row"><span>Login loop on Safari</span><span>51</span></div><div class="bar"><i style="width:40%"></i></div><div class="meta">grouped from 63 reports · Zendesk 4471</div></div>
+                  <div class="issue"><div class="row"><span>Checkout button frozen</span><span>23</span></div><div class="bar"><i style="width:18%"></i></div><div class="meta">grouped from 25 reports · Linear ENG-90</div></div>
+                </div>
+              </div>
+            </div>
+            <div class="dcard">
+              <div class="t">Live status<span class="legend">synced from your tools</span></div>
+              <div class="feed">
+                <div class="r new"><span class="lg" style="background:#2684FF">Ji</span><span>VAT error when saving billing<span class="id">FUN-52 · 214 reports</span></span><span class="status"><span class="s1">Open</span><span class="s2">In review</span><span class="s3">Resolved</span></span></div>
+                <div class="r"><span class="lg" style="background:#24292F">GH</span><span>Export shows a blank PDF<span class="id">#318 · 96 reports</span></span><span class="chip-s" style="background:#FFF1C4;color:#7A5300">In review</span></div>
+                <div class="r"><span class="lg" style="background:#03363D">Ze</span><span>Login loop on Safari<span class="id">4471 · 63 reports</span></span><span class="chip-s" style="background:#E3F4E8;color:#1A7F37">Resolved</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sc-points">
+        <div class="reveal"><h3>Live ticket status</h3><p>Each report shows the status of its ticket in Jira, Zendesk, ServiceNow and 13 more. Lumora checks every two minutes, or right away with webhooks.</p></div>
+        <div class="reveal"><h3>Repeat reports, one issue</h3><p>Reports with the same error are grouped even when IDs or numbers differ, so you see how many people each problem affects.</p></div>
+        <div class="reveal"><h3>Every app in one place</h3><p>Up to 25 apps, 10,000 reports a month and AI Powered included, with the dashboard showing where people get stuck.</p></div>
       </div>
     </div>
   </section>
 
-  <!-- Support Center -->
-  <section class="sec" id="support-center" style="padding-top:0">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow">Support Center · Business</span>
-        <h2 class="d2">Run support for every app from one place.</h2>
-        <p class="lead">The Business plan adds a Support Center: every report in one list with the current status of its ticket, similar reports grouped into issues, and a dashboard that shows where users get stuck.</p>
-      </div>
-      <div class="duo" style="margin-top:0">
-        <article class="sc-tile reveal">
-          <div class="sc-vis bg-sky">
-            <div class="reports">
-              <div class="rep"><div><div>Checkout button frozen</div><div class="id">FUN-61 · Jira</div></div><span class="status"><span class="s1">Open</span><span class="s2">In progress</span><span class="s3">Resolved</span></span></div>
-              <div class="rep"><div><div>Export shows blank PDF</div><div class="id">#318 · GitHub</div></div><span class="chip-s" style="background:#FFF1C4;color:#7A5300">In review</span></div>
-              <div class="rep"><div><div>Login loop on Safari</div><div class="id">4471 · Zendesk</div></div><span class="chip-s" style="background:#E3F4E8;color:#1A7F37">Resolved</span></div>
-            </div>
-          </div>
-          <div class="sc-body">
-            <h3 class="d3">Live ticket status</h3>
-            <span class="sc-role">Synced from Jira, Zendesk, ServiceNow and more</span>
-            <p class="body">Each report shows the current status of its ticket. Lumora checks every two minutes, or right away if you turn on webhooks, which takes one click for most tools.</p>
-            <div class="kpis"><span class="kpi"><b>2 min</b>sync</span><span class="kpi"><b>1 click</b>webhooks</span><span class="kpi"><b>16</b>tools</span></div>
-          </div>
-        </article>
-        <article class="sc-tile reveal">
-          <div class="sc-vis bg-butter">
-            <div class="stack">
-              <div class="card c1">VAT error on save · Chrome</div>
-              <div class="card c2">VAT error on save · Safari</div>
-              <div class="card c3">VAT error on save · Edge</div>
-              <div class="card grp"><b>Issue</b> · VAT error on save<br><span style="opacity:.7">12 people affected · first seen 3 d ago</span></div>
-            </div>
-          </div>
-          <div class="sc-body">
-            <h3 class="d3">Similar reports, one issue</h3>
-            <span class="sc-role">See what affects the most people</span>
-            <p class="body">Reports with the same error are grouped into one issue, even when IDs or numbers in the message differ, so you can see how many people it affects. The dashboard adds time to resolve, top issues and the pages where people get stuck.</p>
-            <div class="kpis"><span class="kpi"><b>32 h</b>median to resolve</span><span class="kpi"><b>Top 5</b>issues</span><span class="kpi"><b>25</b>apps</span></div>
-          </div>
-        </article>
-      </div>
+  <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper-2)"><path d="M0 0 L1440 0 L1440 30 C1360 46 1280 22 1180 38 C1080 54 990 24 890 40 C790 56 700 26 600 42 C500 58 410 28 310 44 C210 58 120 30 0 46 Z" fill="#141311"/></svg>
+
+  <div class="fmodal" id="fmodal" hidden>
+    <div class="scrim" data-close></div>
+    <div class="fpanel" role="dialog" aria-modal="true" aria-labelledby="fmTitle" tabindex="-1">
+      <div class="xwrap"><button type="button" class="x" data-close aria-label="Close">✕</button></div>
+      <div class="fpanel-in" id="fbody"></div>
     </div>
-  </section>
+  </div>
 
   <!-- Pricing -->
   <section class="sec" id="pricing" style="background:var(--paper-2)">
@@ -842,7 +1071,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
         <span style="color:rgba(250,248,242,.6);font-size:14.5px;line-height:1.5">Bug reports that explain themselves.</span>
       </div>
       <div class="cols">
-        <div class="col"><span>Product</span><a href="#how">How it works</a><a href="#ai">AI Powered</a><a href="#support-center">Support Center</a><a href="#pricing">Pricing</a></div>
+        <div class="col"><span>Product</span><a href="#how">How it works</a><a href="#features">Features</a><a href="#support-center">Support Center</a><a href="#pricing">Pricing</a></div>
         <div class="col"><span>Get started</span><a href="#start">Start free</a><a href="/app/">Sign in</a><a href="/demo/">Try the demo</a></div>
         <div class="col"><span>Contact</span><a href="mailto:hello@lumora.app">hello@lumora.app</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">DPA</a></div>
       </div>
@@ -916,7 +1145,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
   var capStep = document.getElementById('capStep'), capText = document.getElementById('capText');
   var caps = [
     ['01 · Something breaks', 'A user runs into a bug.'],
-    ['02 · One click', 'They click the nebula and show what happened.'],
+    ['02 · One click', 'They open the Lumora widget and show what happened.'],
     ['03 · Captured', 'Lumora collects the steps, console and network logs.'],
     ['04 · Your tools', 'The ticket lands in the tool you already use.']
   ];
@@ -1057,6 +1286,161 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       if (!reduce) requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
+  }
+
+  // ---- Features carousel: arrows scroll one card at a time.
+  var track = document.getElementById('ftrack'), fPrev = document.getElementById('fPrev'), fNext = document.getElementById('fNext');
+  if (track) {
+    var step = function () { var c = track.querySelector('.fcard'); return c ? c.getBoundingClientRect().width + 16 : 300; };
+    var sync = function () { fPrev.disabled = track.scrollLeft < 8; fNext.disabled = track.scrollLeft + track.clientWidth > track.scrollWidth - 8; };
+    fPrev.addEventListener('click', function () { track.scrollBy({ left: -step(), behavior: 'smooth' }); });
+    fNext.addEventListener('click', function () { track.scrollBy({ left: step(), behavior: 'smooth' }); });
+    track.addEventListener('scroll', sync, { passive: true }); addEventListener('resize', sync); sync();
+  }
+
+  // ---- Feature modal: grows out of the card that was clicked.
+  var modal = document.getElementById('fmodal'), panel = modal && modal.querySelector('.fpanel'), fbody = document.getElementById('fbody');
+  var order = ['ai', 'tools', 'custom', 'install', 'privacy'], openKey = null, opener = null;
+  var names = { ai: 'AI Powered', tools: 'Integrations', custom: 'Your brand', install: 'Setup', privacy: 'Privacy' };
+  var fill = function (k) {
+    fbody.innerHTML = '';
+    fbody.appendChild(document.getElementById('t-' + k).content.cloneNode(true));
+    fbody.querySelector('h2').id = 'fmTitle';
+    fbody.querySelectorAll('[data-nebula]').forEach(function (el) { el.innerHTML = nebulaSvg(el.getAttribute('data-nebula')); });
+    var nk = order[(order.indexOf(k) + 1) % order.length], foot = document.createElement('div');
+    foot.className = 'fnext';
+    foot.innerHTML = '<a class="btn btn-ink" href="#start" data-close>Start free for 14 days <span class="arrow">→</span></a><button type="button" data-goto="' + nk + '">Next: ' + names[nk] + ' <span>→</span></button>';
+    fbody.appendChild(foot);
+    panel.scrollTop = 0; openKey = k;
+  };
+  var openFeature = function (k, from) {
+    opener = from || opener; fill(k);
+    modal.hidden = false; document.body.classList.add('locked');
+    panel.focus({ preventScroll: true });
+    if (reduce || !from || !panel.animate) return;
+    var a = from.getBoundingClientRect(), b = panel.getBoundingClientRect();
+    panel.animate([
+      { transform: 'translate(' + (a.left - b.left) + 'px,' + (a.top - b.top) + 'px) scale(' + a.width / b.width + ',' + a.height / b.height + ')', opacity: .4, borderRadius: '60px' },
+      { transform: 'none', opacity: 1, borderRadius: '32px' }
+    ], { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    modal.querySelector('.scrim').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: 'ease-out' });
+  };
+  var closeFeature = function () {
+    if (modal.hidden) return;
+    var done = function () { modal.hidden = true; document.body.classList.remove('locked'); fbody.innerHTML = ''; if (opener) opener.focus({ preventScroll: true }); openKey = null; };
+    if (reduce || !panel.animate) return done();
+    var card = opener && opener.isConnected ? opener : null;
+    var frames = [{ transform: 'none', opacity: 1 }, { transform: 'translateY(30px) scale(.94)', opacity: 0 }];
+    if (card && card.dataset.feature === openKey) {
+      var a = card.getBoundingClientRect(), b = panel.getBoundingClientRect();
+      frames[1] = { transform: 'translate(' + (a.left - b.left) + 'px,' + (a.top - b.top) + 'px) scale(' + a.width / b.width + ',' + a.height / b.height + ')', opacity: 0, borderRadius: '60px' };
+    }
+    panel.animate(frames, { duration: 380, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }).onfinish = function () { panel.getAnimations().forEach(function (an) { an.cancel(); }); done(); };
+    modal.querySelector('.scrim').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 380, fill: 'forwards' }).onfinish = function () { this.cancel(); };
+  };
+  if (modal) {
+    document.querySelectorAll('.fcard').forEach(function (c) { c.addEventListener('click', function () { openFeature(c.dataset.feature, c); }); });
+    modal.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-close],[data-goto],[data-replay],[data-acc],[data-copy]');
+      if (!t) return;
+      if (t.hasAttribute('data-close')) { closeFeature(); return; }
+      if (t.dataset.goto) {
+        var k = t.dataset.goto;
+        panel.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-24px)' }], { duration: 180, easing: 'ease-in' }).onfinish = function () {
+          fill(k); opener = document.querySelector('.fcard[data-feature="' + k + '"]');
+          if (opener) opener.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'instant' });
+          panel.animate([{ opacity: 0, transform: 'translateX(24px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'ease-out' });
+        };
+        return;
+      }
+      if (t.hasAttribute('data-replay')) { fill(openKey); return; }
+      if (t.dataset.acc) {
+        document.getElementById('wdemo').style.setProperty('--acc', t.dataset.acc);
+        t.parentNode.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b === t)); });
+        return;
+      }
+      if (t.dataset.copy) {
+        var src = document.getElementById(t.dataset.copy), label = t.textContent;
+        var ok = function () { t.textContent = 'Copied'; setTimeout(function () { t.textContent = label; }, 1600); };
+        var pick = function () { var r = document.createRange(); r.selectNodeContents(src); var s = getSelection(); s.removeAllRanges(); s.addRange(r); t.textContent = 'Selected, press Ctrl+C'; setTimeout(function () { t.textContent = label; }, 2400); };
+        try { navigator.clipboard.writeText(src.textContent).then(ok, pick); } catch (err) { pick(); }
+      }
+    });
+    addEventListener('keydown', function (e) {
+      if (modal.hidden) return;
+      if (e.key === 'Escape') closeFeature();
+      if (e.key === 'Tab') {
+        var f = panel.querySelectorAll('button, a[href]'), first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
+  }
+
+  // ---- Support Center dashboard: chart, sparklines and numbers that count up when it scrolls into view.
+  var dash = document.getElementById('dash');
+  if (dash) {
+    var rnd = seeded(42), days = [], end = new Date(2026, 9, 24);
+    for (var di = 29; di >= 0; di--) {
+      var dt = new Date(end); dt.setDate(end.getDate() - di);
+      var base = 34 + 10 * Math.sin((29 - di) / 4.5) + (29 - di) * .5;
+      var rep = Math.round(base + rnd() * 12), res = Math.round(rep * (.62 + rnd() * .3));
+      days.push({ d: dt, rep: rep, res: res });
+    }
+    var fmt = function (d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    var svgEl = document.getElementById('chart'), box = document.getElementById('chartbox'), tip = document.getElementById('tip');
+    var M = { l: 30, r: 8, t: 8, b: 22 }, max = 70, cw = 0, chh = 220;
+    var xAt = function (i) { return M.l + i * (cw - M.l - M.r) / (days.length - 1); };
+    var yAt = function (v) { return M.t + (1 - v / max) * (chh - M.t - M.b); };
+    var line = function (key) { return days.map(function (p, i) { return (i ? 'L' : 'M') + xAt(i).toFixed(1) + ' ' + yAt(p[key]).toFixed(1); }).join(' '); };
+    var drawChart = function () {
+      cw = box.clientWidth; svgEl.setAttribute('viewBox', '0 0 ' + cw + ' ' + chh);
+      var g = '';
+      [0, 20, 40, 60].forEach(function (v) { g += '<line x1="' + M.l + '" x2="' + (cw - M.r) + '" y1="' + yAt(v) + '" y2="' + yAt(v) + '" stroke="rgba(250,248,242,.08)"/><text x="' + (M.l - 8) + '" y="' + (yAt(v) + 4) + '" text-anchor="end" font-size="11" fill="rgba(250,248,242,.5)">' + v + '</text>'; });
+      [0, 7, 14, 21, 29].forEach(function (i) { g += '<text x="' + xAt(i) + '" y="' + (chh - 4) + '" text-anchor="middle" font-size="11" fill="rgba(250,248,242,.5)">' + fmt(days[i].d) + '</text>'; });
+      var area = line('rep') + ' L' + xAt(days.length - 1) + ' ' + yAt(0) + ' L' + xAt(0) + ' ' + yAt(0) + ' Z';
+      g += '<defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bd8418" stop-opacity=".28"/><stop offset="1" stop-color="#bd8418" stop-opacity="0"/></linearGradient></defs>';
+      g += '<path class="area" d="' + area + '" fill="url(#ga)"/>';
+      g += '<path class="draw-line" pathLength="1" d="' + line('rep') + '" fill="none" stroke="#bd8418" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      g += '<path class="draw-line b" pathLength="1" d="' + line('res') + '" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      var last = days.length - 1;
+      g += '<circle cx="' + xAt(last) + '" cy="' + yAt(days[last].rep) + '" r="4" fill="#bd8418" stroke="#272521" stroke-width="2"/>';
+      g += '<g id="xh" style="opacity:0"><line id="xhl" y1="' + M.t + '" y2="' + (chh - M.b) + '" stroke="rgba(250,248,242,.3)"/><circle id="xh1" r="4.5" fill="#bd8418" stroke="#272521" stroke-width="2"/><circle id="xh2" r="4.5" fill="#3987e5" stroke="#272521" stroke-width="2"/></g>';
+      svgEl.innerHTML = g;
+      if (reduce) svgEl.querySelectorAll('.draw-line').forEach(function (p) { p.style.strokeDashoffset = 0; });
+    };
+    drawChart(); addEventListener('resize', drawChart);
+    box.addEventListener('pointermove', function (e) {
+      var r = box.getBoundingClientRect(), x = e.clientX - r.left;
+      var i = Math.max(0, Math.min(days.length - 1, Math.round((x - M.l) / ((cw - M.l - M.r) / (days.length - 1))))), p = days[i];
+      var xh = document.getElementById('xh'); xh.style.opacity = 1;
+      document.getElementById('xhl').setAttribute('x1', xAt(i)); document.getElementById('xhl').setAttribute('x2', xAt(i));
+      var c1 = document.getElementById('xh1'), c2 = document.getElementById('xh2');
+      c1.setAttribute('cx', xAt(i)); c1.setAttribute('cy', yAt(p.rep)); c2.setAttribute('cx', xAt(i)); c2.setAttribute('cy', yAt(p.res));
+      tip.innerHTML = '<b>' + fmt(p.d) + '</b><i style="background:#bd8418"></i>Reports ' + p.rep + '<br><i style="background:#3987e5"></i>Resolved ' + p.res;
+      tip.style.left = Math.max(70, Math.min(cw - 70, xAt(i))) + 'px'; tip.style.opacity = 1;
+    });
+    box.addEventListener('pointerleave', function () { tip.style.opacity = 0; var xh = document.getElementById('xh'); if (xh) xh.style.opacity = 0; });
+    var spark = function (id, vals, color) {
+      var el = document.getElementById(id), mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+      var pts = vals.map(function (v, i) { return (i * 100 / (vals.length - 1)).toFixed(1) + ',' + (23 - (v - mn) / (mx - mn || 1) * 20).toFixed(1); }).join(' ');
+      el.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>';
+    };
+    spark('spark1', days.map(function (p) { return p.rep; }), '#bd8418');
+    spark('spark2', days.map(function (p) { return p.rep - p.res; }), 'rgba(250,248,242,.5)');
+    spark('spark3', days.map(function (p, i) { return 30 - i * .4 + Math.sin(i) * 3; }), '#3987e5');
+    spark('spark4', days.map(function (p, i) { return 8 + i * .3 + Math.cos(i / 2) * 2; }), 'rgba(250,248,242,.5)');
+    var countUp = function () {
+      dash.querySelectorAll('[data-count]').forEach(function (el) {
+        var target = +el.dataset.count, suf = el.dataset.suffix || '', t0 = null;
+        var tick = function (now) { if (t0 === null) t0 = now; var k = Math.min(1, (now - t0) / 1400), v = Math.round(target * (1 - Math.pow(1 - k, 3))); el.textContent = v.toLocaleString('en-US') + suf; if (k < 1) requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      });
+    };
+    if ('IntersectionObserver' in window && !reduce) {
+      var io = new IntersectionObserver(function (en) { if (en[0].isIntersecting) { dash.classList.add('seen'); countUp(); io.disconnect(); } }, { threshold: .3 });
+      io.observe(dash);
+    } else dash.classList.add('seen');
   }
 
   // ---- Start form: hands the details to the sign-up screen in the back office.
