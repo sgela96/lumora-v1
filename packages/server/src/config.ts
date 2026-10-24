@@ -39,6 +39,7 @@ export const config = {
   widgetDist: path.join(repoRoot, 'packages', 'widget', 'dist'),
   dashboardDist: path.join(repoRoot, 'packages', 'dashboard', 'dist'),
   demoDir: path.join(repoRoot, 'demo'),
+  siteDir: path.join(repoRoot, 'site'),
   maxUploadMb: Number(env('LUMORA_MAX_UPLOAD_MB', '100')),
   stripe: {
     secretKey: env('STRIPE_SECRET_KEY'),

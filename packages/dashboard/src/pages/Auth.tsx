@@ -4,12 +4,17 @@ import { Field, Nebula } from '../components/ui';
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
 
-const resetToken = () => new URLSearchParams(location.hash.split('?')[1] ?? '').get('token') ?? '';
+const hashParams = () => new URLSearchParams(location.hash.split('?')[1] ?? '');
+const resetToken = () => hashParams().get('token') ?? '';
 
 export function AuthPage({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<Mode>(location.hash.startsWith('#/reset') ? 'reset' : location.hash.includes('register') ? 'register' : 'login');
   const [sent, setSent] = useState(false);
-  const [form, setForm] = useState({ name: '', company: '', email: '', password: '' });
+  // The website's "Start free" form hands over name, e-mail and company in the hash.
+  const [form, setForm] = useState(() => {
+    const q = hashParams();
+    return { name: q.get('name') ?? '', company: q.get('company') ?? '', email: q.get('email') ?? '', password: '' };
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [k]: e.target.value });

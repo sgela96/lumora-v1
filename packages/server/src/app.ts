@@ -63,7 +63,8 @@ export function createApp(): express.Express {
     else res.status(500).json({ error: 'Internal Server Error' });
   });
   app.use('/demo', express.static(config.demoDir));
-  app.get('/', (_req, res) => res.redirect('/app/'));
+  // Marketing website at the root.
+  app.use('/', express.static(config.siteDir, { index: 'index.html', maxAge: '5m' }));
 
   app.use((_req, _res, next) => next(new HttpError(404, 'Not found')));
 
