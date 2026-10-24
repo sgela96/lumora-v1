@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme Billing — Lumora demo</title>
+    <style>
+      :root { --bg: #f6f7fb; --card: #fff; --text: #111827; --muted: #6b7280; --border: #e5e7eb; --brand: #4f46e5; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+      header { display: flex; align-items: center; gap: 24px; padding: 14px 28px; background: var(--card); border-bottom: 1px solid var(--border); }
+      header strong { font-size: 18px; }
+      nav a { color: var(--muted); text-decoration: none; margin-right: 16px; font-weight: 500; }
+      nav a.active { color: var(--brand); }
+      main { max-width: 960px; margin: 28px auto; padding: 0 20px; display: grid; gap: 20px; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+      h1 { margin: 0 0 4px; font-size: 26px; }
+      h2 { margin: 0 0 12px; font-size: 17px; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      label { display: block; font-weight: 600; font-size: 13px; margin: 10px 0 4px; }
+      input, select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; font: inherit; }
+      button { padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border); background: #fff; font: inherit; font-weight: 600; cursor: pointer; margin: 4px 6px 4px 0; }
+      button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+      .balance { font-size: 32px; font-weight: 800; }
+      .banner { padding: 12px 16px; border-radius: 12px; background: #eef2ff; color: #3730a3; font-size: 14px; }
+      .preview .banner { display: none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>◆ Acme Billing</strong>
+      <nav>
+        <a href="#" data-page="/dashboard" class="active">Dashboard</a>
+        <a href="#" data-page="/invoices">Invoices</a>
+        <a href="#" data-page="/settings">Settings</a>
+      </nav>
+    </header>
+    <main>
+      <div class="banner">
+        This is a fake app to try <strong>Lumora</strong>. Break something with the buttons below, then click the ☀️ sun in the corner.
+      </div>
+      <div>
+        <h1 id="page-title">Dashboard</h1>
+        <p>Welcome back, Ana. Here’s what’s happening with your account.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>Balance</h2>
+          <div class="balance account-balance">$12,480.00</div>
+          <p>Marked as private: hidden in screenshots when the “Hide elements” rule <code>.account-balance</code> is set.</p>
+          <button class="primary" id="pay">Pay outstanding invoice</button>
+        </div>
+        <div class="card">
+          <h2>Break things</h2>
+          <button id="throw">Throw a JS error</button>
+          <button id="reject">Unhandled rejection</button>
+          <button id="fetch500">API call → 500</button>
+          <button id="fetch404">API call → 404</button>
+          <button id="warn">console.warn</button>
+        </div>
+        <div class="card">
+          <h2>Update billing details</h2>
+          <form id="billing">
+            <label for="company">Company name</label>
+            <input id="company" name="company" placeholder="Acme Inc." />
+            <label for="country">Country</label>
+            <select id="country" name="country">
+              <option>Argentina</option>
+              <option>Mexico</option>
+              <option>Spain</option>
+              <option>United States</option>
+            </select>
+            <label for="card">Card number</label>
+            <input id="card" name="cc-number" autocomplete="cc-number" placeholder="4242 4242 4242 4242" />
+            <label><input type="checkbox" id="invoices-email" style="width:auto" /> E-mail me invoices</label>
+            <button class="primary" type="submit">Save details</button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.get('preview')) document.documentElement.classList.add('preview');
+
+      // Lumora queue stub: calls made before the script loads are replayed.
+      window.Lumora = window.Lumora || function () { (Lumora.q = Lumora.q || []).push(arguments); };
+      Lumora('identify', { id: 'usr_1024', email: 'ana@acme.test', name: 'Ana García', plan: 'enterprise', role: 'admin' });
+      Lumora('metadata', { release: '3.8.2', tenant: 'acme' });
+
+      const key = params.get('key');
+      if (key) {
+        const s = document.createElement('script');
+        s.src = '/lumora.js';
+        s.async = true;
+        s.dataset.key = key;
+        document.head.appendChild(s);
+      } else {
+        document.querySelector('.banner').innerHTML = 'Open this page from the Lumora dashboard (<em>Install → Try it on a demo page</em>) so it knows which widget key to use.';
+      }
+
+      document.querySelectorAll('nav a').forEach((a) =>
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          history.pushState({}, '', a.dataset.page + location.search);
+          document.querySelectorAll('nav a').forEach((x) => x.classList.toggle('active', x === a));
+          document.getElementById('page-title').textContent = a.textContent;
+        }),
+      );
+      document.getElementById('throw').onclick = () => {
+        const invoice = undefined;
+        return invoice.total.toFixed(2);
+      };
+      document.getElementById('reject').onclick = () => Promise.reject(new Error('Payment provider timeout'));
+      document.getElementById('fetch500').onclick = () => fetch('/demo/api/charge?token=sk_live_abc123', { method: 'POST' }).catch(() => {});
+      document.getElementById('fetch404').onclick = () => fetch('/demo/api/invoices/INV-0042').catch(() => {});
+      document.getElementById('warn').onclick = () => console.warn('Deprecated: invoices API v1 will be removed', { endpoint: '/v1/invoices' });
+      document.getElementById('pay').onclick = async () => {
+        const res = await fetch('/demo/api/pay', { method: 'POST' });
+        if (!res.ok) console.error(`Payment failed with status ${res.status}`);
+      };
+      document.getElementById('billing').onsubmit = (e) => {
+        e.preventDefault();
+        console.error('ValidationError: VAT number is required for', document.getElementById('country').value);
+      };
+    </script>
+  </body>
+</html>

@@ -28,3 +28,7 @@ yarn-error.log*
 *.swo
 *~
 
+
+# Lumora runtime data
+/data
+packages/*/dist
