@@ -1,0 +1,19 @@
+{
+  "name": "lumora",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lumora — a floating sun that turns bug reports into complete support tickets.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @lumora/widget && npm run build -w @lumora/dashboard && npm run build -w @lumora/server",
+    "dev": "npm run build -w @lumora/widget && npm run build -w @lumora/dashboard && npm run dev -w @lumora/server",
+    "start": "npm run start -w @lumora/server",
+    "test": "npm test -w @lumora/widget && npm test -w @lumora/server",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
