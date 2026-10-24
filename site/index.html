@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lumora — Bug reports that explain themselves</title>
-<meta name="description" content="A glowing widget for any web app that turns “something’s broken” into a complete ticket — screenshot or recording, steps to reproduce, console and network — in Jira, Zendesk or the tool your team already uses.">
+<title>Lumora | Bug reports that explain themselves</title>
+<meta name="description" content="Lumora adds a small bug report button to your web app. Users send a screenshot or screen recording, and your team gets a complete ticket in Jira, Zendesk or the tool it already uses.">
 <meta name="theme-color" content="#FAF8F2">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='.35' stop-color='%23FFF3CF'/%3E%3Cstop offset='.7' stop-color='%23FFD666' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%23FFD666' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='48' fill='url(%23g)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* Lumora website. Paper and night sections joined by soft edges; the nebula is the light source.
-   Section rhythm follows the Century Labs home: hero → bento → pinned steps → pinned AI → lanes → tools → tiles → form. */
+   Section rhythm follows the Century Labs home: hero → pinned problem and steps → pinned AI → privacy rows → tools → tiles → pricing → form. */
 :root{
   --paper:#FAF8F2;--paper-2:#F2EEE4;--ink:#1C1828;--ink-2:#5D5869;--ink-3:#8A8597;
   --night:#15121E;--night-2:#1F1A2C;--night-line:rgba(250,248,242,.12);
@@ -110,7 +110,7 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 @keyframes lu-nb-glow{0%,100%{opacity:.8;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
 
 /* Hero */
-.hero{padding:clamp(40px,6vw,72px) 0 0}
+.hero{padding:clamp(40px,6vw,72px) 0 clamp(72px,9vw,120px)}
 .hero-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:24px;align-items:center}
 .pill-tag{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px rgba(28,24,40,.08)}
 .pill-tag .dot{width:7px;height:7px;border-radius:50%;background:var(--sun);box-shadow:0 0 0 3px rgba(255,214,102,.35)}
@@ -138,42 +138,24 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .night::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 50% at 80% 0%,rgba(130,100,200,.16),transparent 70%),radial-gradient(40% 40% at 10% 100%,rgba(255,214,102,.07),transparent 70%)}
 .night>*{position:relative}
 
-/* Bento */
-.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
-.b-big{grid-column:span 3}.b-small{grid-column:span 2}
-@media (max-width:980px){.bento{grid-template-columns:1fr}.b-big,.b-small{grid-column:auto}}
+/* Tiles */
 .tile{border-radius:28px;overflow:hidden;position:relative;transition:transform .6s var(--ease)}
 .tile:hover{transform:translateY(-6px)}
-.b-big{padding:clamp(24px,3vw,40px);display:flex;flex-direction:column;gap:28px;min-height:560px}
-.b-big .head{display:flex;flex-direction:column;gap:14px}
-.b-big .head p{max-width:460px}
-.b-big ul{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:auto;font-size:15px}
-.b-big li{display:flex;gap:8px;align-items:baseline}
-.b-big li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--sun);transform:translateY(-2px)}
-.t-dark{background:var(--ink);color:var(--paper)}
-.t-dark .body,.t-dark .tag,.t-dark li{color:rgba(250,248,242,.72)}
-.t-light{background:#fff}
-.b-small{padding:30px;display:flex;flex-direction:column;gap:12px}
-.b-small .ic{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.7);display:grid;place-items:center;margin-bottom:12px}
-.b-small .ic svg{width:22px;height:22px;stroke:var(--ink);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .bg-butter{background:var(--butter-soft)}.bg-lilac{background:var(--lilac-soft)}.bg-sky{background:var(--sky-soft)}
 
-/* Scene: screenshot markup */
-.shot{position:relative;flex:1;min-height:250px;display:grid;place-items:center}
-.mock{width:min(360px,100%);background:#fff;color:var(--ink);border-radius:16px;padding:18px;box-shadow:0 30px 60px -30px rgba(0,0,0,.6);position:relative;font-size:12px}
-.mock .t{font-weight:600;font-size:14px;margin-bottom:12px}
-.mock label{display:block;color:var(--ink-3);font-size:11px;margin:8px 0 4px}
-.mock .in{height:28px;border-radius:8px;background:#F4F2EE;display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
-.mock .save{display:inline-flex;margin-top:14px;padding:7px 14px;border-radius:8px;background:#5B4CF0;color:#fff;font-weight:600}
-.mark-hl{position:absolute;left:12px;bottom:10px;width:96px;height:44px;overflow:visible}
+/* Compact scenes inside the step cards */
+.mock-s{position:absolute;inset:18px;border-radius:12px;background:var(--paper);color:var(--ink);padding:16px;font-size:12px}
+.row-s{display:flex;flex-direction:column;gap:5px;color:var(--ink-3);font-size:11px}
+.in-s{position:relative;overflow:hidden;height:28px;border-radius:8px;background:#ECE9E2;display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.save-s{display:inline-flex;margin-top:14px;padding:7px 14px;border-radius:8px;background:#5B4CF0;color:#fff;font-weight:600}
+.mock-s .mark-hl{position:absolute;left:10px;bottom:8px;width:110px;height:46px;overflow:visible}
 .mark-hl rect{fill:rgba(255,214,102,.18);stroke:var(--sun-deep);stroke-width:2.5;stroke-dasharray:1;animation:hl 6s ease-in-out infinite}
 @keyframes hl{0%,12%{stroke-dashoffset:1;fill-opacity:0}30%,88%{stroke-dashoffset:0;fill-opacity:1}100%{stroke-dashoffset:0;opacity:0}}
-.mark-arrow{position:absolute;left:112px;bottom:22px;width:120px;height:60px;overflow:visible}
-.mark-arrow path{fill:none;stroke:#E5484D;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;animation:arr 6s ease-in-out infinite}
-@keyframes arr{0%,30%{stroke-dashoffset:1}48%,88%{stroke-dashoffset:0}100%{stroke-dashoffset:0;opacity:0}}
-.redact{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:8px;transform-origin:left;animation:redact 6s ease-in-out infinite}
+.redact{position:absolute;inset:0 auto 0 0;width:100%;background:var(--ink);border-radius:8px;transform-origin:left;animation:redact 6s ease-in-out infinite}
 @keyframes redact{0%,46%{transform:scaleX(0)}58%,88%{transform:scaleX(1)}100%{transform:scaleX(1);opacity:0}}
-.mock .note{position:absolute;right:-14px;top:-14px;padding:6px 10px;border-radius:999px;background:var(--sun);font-weight:600;font-size:11px;animation:pop 6s var(--ease) infinite both;animation-delay:-1.5s}
+.mock-s .note{position:absolute;right:14px;bottom:20px;padding:6px 10px;border-radius:999px;background:var(--sun);font-weight:600;font-size:11px;animation:pop 6s var(--ease) infinite both;animation-delay:-1.5s}
+.steps-s{position:absolute;inset:14px;display:flex;flex-direction:column;gap:6px;justify-content:center}
+.steps-s .step{padding:7px 11px;font-size:12.5px;border-radius:10px}
 
 /* Scene: recording steps */
 .rec{flex:1;min-height:250px;display:flex;flex-direction:column;gap:8px;justify-content:center}
@@ -183,7 +165,7 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .wave{display:flex;gap:3px;align-items:center;height:22px}
 .wave i{display:block;width:3px;border-radius:2px;background:var(--sun-deep);animation:wave 1s ease-in-out infinite}
 @keyframes wave{0%,100%{height:5px}50%{height:20px}}
-.step{display:flex;gap:12px;align-items:baseline;border-radius:12px;padding:11px 14px;background:#F6F4EF;font-size:14px;animation:pop 6s var(--ease) infinite both}
+.step{display:flex;gap:12px;align-items:baseline;border-radius:12px;padding:11px 14px;background:#F6F4EF;color:var(--ink);font-size:14px;animation:pop 6s var(--ease) infinite both}
 .step .ts{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);flex:none}
 .step.err{background:#FDECEE;color:#A1121E}
 @keyframes pop{0%{opacity:0;transform:translateY(16px) scale(.94)}12%,82%{opacity:1;transform:none}94%,100%{opacity:0;transform:translateY(-6px)}}
@@ -205,7 +187,8 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 .hcard .num b{font-size:56px;font-weight:600;letter-spacing:-.05em;line-height:1;color:var(--sun)}
 .hcard p{color:rgba(250,248,242,.7);font-size:16px;line-height:1.5}
 .gain{display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:15px}
-.gain .tag{color:var(--sun)}
+.gain li{display:flex;gap:10px;align-items:baseline}
+.gain li::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--sun);transform:translateY(-2px)}
 .hcard.cta{justify-content:center;align-items:flex-start;gap:28px;background:linear-gradient(160deg,#2A2238,#1F1A2C);min-height:100%}
 .scene{position:relative;height:184px;border-radius:18px;background:rgba(250,248,242,.05);overflow:hidden}
 /* scene 1 */
@@ -289,19 +272,16 @@ nav.bar{height:72px;display:flex;align-items:center;justify-content:space-betwee
 @media (max-width:980px){.ai-head{grid-template-columns:1fr}.ai-panel{grid-template-columns:1fr;justify-items:center}.ai-in,.ai-out{width:100%}}
 
 /* Lanes */
-.lanes{overflow-x:auto;border-radius:24px;background:rgba(250,248,242,.03);border:1px solid var(--night-line);padding:6px 18px}
-.lanerow{position:relative;display:grid;grid-template-columns:170px repeat(5,minmax(0,1fr));min-width:920px;border-top:1px solid var(--night-line)}
-.lanerow:first-child{border-top:0}
-.lanerow>div{padding:20px 12px;position:relative;z-index:1;display:flex;align-items:center;gap:8px}
-.lanerow.head>div{font-weight:500;color:rgba(250,248,242,.6);font-size:14px}
-.lanerow .who{font-weight:500}
-.lanerow .who i{width:8px;height:8px;border-radius:50%}
+.lanes{border-radius:24px;background:rgba(250,248,242,.03);border:1px solid var(--night-line);padding:6px 24px}
+.keeprow{position:relative;display:grid;grid-template-columns:180px minmax(0,1fr);gap:16px;align-items:center;padding:22px 0;border-top:1px solid var(--night-line)}
+.keeprow:first-child{border-top:0}
+.keeprow .who{display:flex;align-items:center;gap:8px;font-weight:500}
+.keeprow .who i{width:8px;height:8px;border-radius:50%}
 .pill{display:inline-block;white-space:nowrap;padding:8px 13px;border-radius:999px;font-size:14px;font-weight:500;letter-spacing:-.01em}
 .pill.u{background:var(--sun);color:var(--ink)}
-.pill.l{background:#2A2438;color:var(--paper);border:1px solid rgba(250,248,242,.16)}
-.dash{color:rgba(250,248,242,.3)}
-.travel{position:absolute;top:50%;left:170px;width:10px;height:10px;margin-top:-5px;border-radius:50%;z-index:0;animation:travel 7s linear infinite}
-@keyframes travel{from{left:170px;opacity:0}8%{opacity:1}92%{opacity:1}to{left:calc(100% - 10px);opacity:0}}
+.pill.l{background:#2A2438;color:rgba(250,248,242,.7);border:1px solid rgba(250,248,242,.16)}
+.pill.l s{text-decoration-color:rgba(229,72,77,.8);text-decoration-thickness:1.5px}
+@media (max-width:700px){.keeprow{grid-template-columns:minmax(0,1fr)}.pill{white-space:normal}}
 .trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:16px}
 .trio>div{border-radius:24px;padding:28px;background:rgba(250,248,242,.04);border:1px solid var(--night-line);display:flex;flex-direction:column;gap:10px}
 .trio .d3{color:var(--paper)}
@@ -444,9 +424,9 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
     <nav class="bar" aria-label="Main">
       <a class="brand" href="#top"><span class="mark" data-nebula="low"></span>Lumora</a>
       <div class="navlinks">
-        <a class="navlink" href="#product">Product</a>
         <a class="navlink" href="#how">How it works</a>
         <a class="navlink" href="#ai">AI Powered</a>
+        <a class="navlink" href="#privacy">Privacy</a>
         <a class="navlink" href="#integrations">Integrations</a>
         <a class="navlink" href="#pricing">Pricing</a>
       </div>
@@ -471,7 +451,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
             <span class="mask"><span>that <span class="rot"><span class="rot-track"><span>explain</span><span>write</span><span>triage</span><span>route</span><span>explain</span></span></span></span></span>
             <span class="mask"><span><span class="squiggle">themselves.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></span></span>
           </h1>
-          <p class="lead fade">A glowing widget that lives in the corner of your app. Users show what went wrong; Lumora turns it into a complete ticket — steps, console, network and all — in the tools your team already uses.</p>
+          <p class="lead fade">Lumora adds a small glowing button to your web app. When something breaks, users send a screenshot or a screen recording, and your team gets a ticket with the steps, console errors and browser details already filled in.</p>
           <div class="ctas fade">
             <a class="btn btn-ink" href="#start">Start free for 14 days <span class="arrow">→</span></a>
             <a class="btn btn-line plain" href="#how">See how it works</a>
@@ -488,91 +468,22 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       </div>
       <div class="stats">
         <div class="stat fade"><b>1 line</b><span>of code to install, on any web app</span></div>
-        <div class="stat fade"><b>19</b><span>tools where tickets land, from Jira to ServiceNow</span></div>
-        <div class="stat fade"><b>10 min</b><span>from sign-up to your first complete ticket</span></div>
+        <div class="stat fade"><b>19</b><span>integrations, from Jira to ServiceNow</span></div>
+        <div class="stat fade"><b>10 min</b><span>from sign-up to your first ticket</span></div>
         <div class="stat fade"><b>14 days</b><span>of Pro free, no card required</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Product bento -->
-  <section class="sec" id="product">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow">The problem</span>
-        <h2 class="d2">Support spends its time asking, not fixing.</h2>
-        <p class="lead">“Can you send a screenshot?” “Which browser?” “What did you click before that?” Lumora answers all three before anyone has to ask.</p>
-      </div>
-      <div class="bento">
-        <article class="tile b-big t-dark reveal">
-          <div class="head">
-            <span class="tag">01 · Screenshot</span>
-            <h3 class="d2" style="font-size:clamp(32px,3.2vw,48px)">Show it, marked up.</h3>
-            <p class="body">A capture of the page with no browser permissions. Users highlight, draw and black out private data right in the panel.</p>
-          </div>
-          <div class="shot" aria-hidden="true">
-            <div class="mock">
-              <div class="t">Update billing details</div>
-              <label>Company name</label><div class="in">Globex S.A.</div>
-              <label>Card number</label><div class="in" style="position:relative;overflow:hidden">4242 4242 4242 4242<span class="redact"></span></div>
-              <span class="save">Save details</span>
-              <svg class="mark-hl" viewBox="0 0 96 44"><rect pathLength="1" x="2" y="2" width="92" height="40" rx="10"/></svg>
-              <svg class="mark-arrow" viewBox="0 0 120 60"><path pathLength="1" d="M112 8 C 80 10, 40 18, 14 34 M14 34 L28 36 M14 34 L20 22"/></svg>
-              <span class="note">Nothing happens!</span>
-            </div>
-          </div>
-          <ul>
-            <li>Highlight and draw</li><li>Hide private data</li>
-            <li>No permissions needed</li><li>Light and dark, English and Spanish</li>
-          </ul>
-        </article>
-        <article class="tile b-big t-light reveal">
-          <div class="head">
-            <span class="tag">02 · Screen recording</span>
-            <h3 class="d2" style="font-size:clamp(32px,3.2vw,48px)">Record the screen. Get the steps.</h3>
-            <p class="body">While the user records, Lumora follows every click, field and page change and writes numbered, timestamped steps to reproduce.</p>
-          </div>
-          <div class="rec" aria-hidden="true">
-            <div class="rec-top"><span class="rec-dot"></span><span class="tag">Recording · 0:07</span><span class="wave"><i style="animation-delay:-.1s"></i><i style="animation-delay:-.4s"></i><i style="animation-delay:-.2s"></i><i style="animation-delay:-.7s"></i><i style="animation-delay:-.3s"></i></span></div>
-            <div class="step" style="animation-delay:0s"><span class="ts">0:01</span>Click the “Settings” link</div>
-            <div class="step" style="animation-delay:.25s"><span class="ts">0:02</span>Select “Mexico” in “Country”</div>
-            <div class="step" style="animation-delay:.5s"><span class="ts">0:03</span>Type into the “Company name” field</div>
-            <div class="step" style="animation-delay:.75s"><span class="ts">0:04</span>Click the “Save details” button</div>
-            <div class="step err" style="animation-delay:1s"><span class="ts">0:04</span>⚠ ValidationError: VAT number is required</div>
-          </div>
-          <ul>
-            <li>With the user’s voice</li><li>Errors marked in the step</li>
-            <li>Typed values masked</li><li>Up to 10 minutes</li>
-          </ul>
-        </article>
-        <article class="tile b-small bg-butter reveal">
-          <span class="ic"><svg viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 6l-2 12"/></svg></span>
-          <h3 class="d3">Everything attached.</h3>
-          <p class="body">Console errors with stack traces, failed requests, browser, OS and the user’s last steps. Always included.</p>
-        </article>
-        <article class="tile b-small bg-lilac reveal">
-          <span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
-          <h3 class="d3">Private by default.</h3>
-          <p class="body">E-mails, card numbers and tokens are scrubbed in the browser. What users type is never sent.</p>
-        </article>
-        <article class="tile b-small bg-sky reveal">
-          <span class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="3.5"/><path d="M3 19c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5M16 6.5a3 3 0 0 1 0 5.5M18 14.8c1.4.6 2.4 2 2.8 4.2"/></svg></span>
-          <h3 class="d3">Knows who reported it.</h3>
-          <p class="body">One optional call passes the user’s ID, e-mail and plan, so nobody has to type them.</p>
-        </article>
       </div>
     </div>
   </section>
 
   <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 46 C90 30 150 58 250 40 C340 24 420 52 520 36 C610 22 700 56 800 38 C900 20 990 50 1090 34 C1180 20 1260 48 1340 32 C1390 24 1420 30 1440 28 L1440 72 L0 72 Z" fill="#15121E"/><path d="M0 58 C140 50 260 66 400 54 C560 42 700 64 860 52 C1020 42 1180 62 1440 50 L1440 72 L0 72 Z" fill="#15121E"/></svg>
 
-  <!-- How it works: pinned horizontal steps -->
+  <!-- How it works: the problem, then the four steps on a pinned horizontal track -->
   <section class="hsec night on-night" id="how">
     <div class="hpin">
       <div class="wrap"><div class="hhead">
         <span class="eyebrow">How it works</span>
-        <h2 class="d2">Four steps. Not <span class="squiggle view">one meeting.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></h2>
-        <p class="lead" style="max-width:520px">From the user’s click to a ticket your developer can start on. Scroll to walk through them.</p>
+        <h2 class="d2">Stop asking users for <span class="squiggle view">screenshots.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></h2>
+        <p class="lead" style="max-width:600px">Which browser are you on? What did you click? Can you send a screenshot? Most bug reports start with a round of questions. With Lumora, the answers arrive with the report.</p>
       </div></div>
       <div class="wrap" style="max-width:none;padding-right:0">
         <div class="htrack">
@@ -581,50 +492,51 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
               <div class="mini"><i style="width:40%"></i><i style="width:70%"></i><i style="width:55%"></i><i style="width:62%"></i><span class="ring"></span><span class="nb" data-nebula="low"></span></div>
               <span class="cursor"><svg viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z"/></svg></span>
             </div>
-            <div class="num"><b>01</b><span class="tag">Your user · one click</span></div>
+            <div class="num"><b>01</b><span class="tag">Your user</span></div>
             <h3 class="d3">Click the nebula</h3>
-            <p>It lives in the corner of your app and glows softly when the page throws an error.</p>
-            <div class="gain"><span class="tag">You gain</span><span>Reports from people who’d never file a ticket</span><span>Errors noticed the moment they happen</span><span>A widget in your colors, your language</span></div>
+            <p>A small glowing button sits in the corner of your app. It pulses when the page throws an error, so people notice it at the right moment.</p>
+            <ul class="gain"><li>Reports from users who would never open a ticket</li><li>Errors noticed as they happen</li><li>Your colors, English or Spanish</li></ul>
           </article>
           <article class="hcard">
             <div class="scene" aria-hidden="true">
-              <div class="frame"><i></i><i></i><i style="grid-column:span 2"></i>
-                <span class="recl"><span class="rec-dot"></span>REC 0:42</span>
-                <span class="wave"><i style="animation-delay:-.1s"></i><i style="animation-delay:-.5s"></i><i style="animation-delay:-.3s"></i><i style="animation-delay:-.8s"></i><i style="animation-delay:-.2s"></i><i style="animation-delay:-.6s"></i></span>
+              <div class="mock-s">
+                <div class="row-s"><span>Card number</span><span class="in-s">4242 4242 4242 4242<span class="redact"></span></span></div>
+                <span class="save-s">Save details</span>
+                <svg class="mark-hl" viewBox="0 0 96 44"><rect pathLength="1" x="2" y="2" width="92" height="40" rx="10"/></svg>
+                <span class="note">Nothing happens!</span>
               </div>
             </div>
-            <div class="num"><b>02</b><span class="tag">Your user · seconds</span></div>
+            <div class="num"><b>02</b><span class="tag">Your user</span></div>
             <h3 class="d3">Show the problem</h3>
-            <p>A marked-up screenshot or a screen recording with voice. No forms to decode later.</p>
-            <div class="gain"><span class="tag">You gain</span><span>The exact screen, not a description of it</span><span>Their voice, in sync with the video</span><span>Private data blacked out by them</span></div>
+            <p>They take a screenshot and mark it up, or record their screen and talk through what happened. Anything private can be blacked out first.</p>
+            <ul class="gain"><li>Highlight, draw and hide data</li><li>Screen recording with voice, up to 10 minutes</li><li>No browser permissions for screenshots</li></ul>
           </article>
           <article class="hcard">
             <div class="scene" aria-hidden="true">
-              <div class="doc">
-                <div class="row"><b>Steps</b><span class="bar" style="width:70%"></span></div>
-                <div class="row"><b>Console</b><span class="bar" style="width:46%"></span></div>
-                <div class="row"><b>Network</b><span class="bar" style="width:58%"></span></div>
-                <div class="row"><b>Browser</b><span class="bar" style="width:38%"></span></div>
-                <div class="row" style="margin-top:4px"><span class="chip-s chip-red">1 error</span><span class="chip-s chip-blue">POST 422</span></div>
+              <div class="steps-s">
+                <div class="step" style="animation-delay:0s"><span class="ts">0:01</span>Click “Settings”</div>
+                <div class="step" style="animation-delay:.3s"><span class="ts">0:02</span>Select “Mexico” in “Country”</div>
+                <div class="step" style="animation-delay:.6s"><span class="ts">0:04</span>Click “Save details”</div>
+                <div class="step err" style="animation-delay:.9s"><span class="ts">0:04</span>⚠ VAT number is required</div>
               </div>
             </div>
-            <div class="num"><b>03</b><span class="tag">Lumora · automatic</span></div>
+            <div class="num"><b>03</b><span class="tag">Lumora</span></div>
             <h3 class="d3">Lumora writes it up</h3>
-            <p>Steps to reproduce, console errors, failed requests, browser and user, attached to every report.</p>
-            <div class="gain"><span class="tag">You gain</span><span>Numbered steps with timestamps</span><span>Console and network, errors marked</span><span>An AI summary and priority, if you want them</span></div>
+            <p>While they record, Lumora notes each click and page change and turns them into numbered steps. Console errors, failed requests and browser details are attached automatically.</p>
+            <ul class="gain"><li>Steps with timestamps</li><li>Errors shown on the step where they happened</li><li>Typed values are never recorded</li></ul>
           </article>
           <article class="hcard">
             <div class="scene" aria-hidden="true">
               <div class="railbox"><div class="rail" id="rail"></div></div>
             </div>
-            <div class="num"><b>04</b><span class="tag">Your tool · instant</span></div>
-            <h3 class="d3">Ticket, ready to work</h3>
-            <p>Created in Jira, GitHub, Zendesk or 16 more, following your template, with its status synced back.</p>
-            <div class="gain"><span class="tag">You gain</span><span>Tickets in the format your team uses</span><span>Live status, back in Lumora</span><span>Similar reports grouped into one issue</span></div>
+            <div class="num"><b>04</b><span class="tag">Your team</span></div>
+            <h3 class="d3">Get a ticket you can work on</h3>
+            <p>The ticket is created in Jira, GitHub, Zendesk or wherever your team works, using your template, with the screenshot or video attached.</p>
+            <ul class="gain"><li>Your template, formatted for each tool</li><li>Status changes come back to Lumora</li><li>Repeat reports grouped together</li></ul>
           </article>
           <article class="hcard cta">
             <span style="width:96px;height:96px" data-nebula></span>
-            <h3 class="d2" style="font-size:clamp(34px,3.4vw,52px)">One line to install. Free to start.</h3>
+            <h3 class="d2" style="font-size:clamp(34px,3.4vw,52px)">It takes one line of code to install.</h3>
             <a class="btn btn-sun" href="#start">Start your free trial <span class="arrow">→</span></a>
           </article>
         </div>
@@ -643,7 +555,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
             <span class="ai-pill">AI Powered</span>
             <h2 class="d2">The ticket explains itself.</h2>
           </div>
-          <p class="lead">AI Powered listens to what the user said, reads what the page logged and writes the ticket a developer would write — summary, expected vs. actual, priority and likely cause, in your team’s language.</p>
+          <p class="lead">AI Powered listens to the user’s voice note, reads the console and network logs, and drafts the ticket for you: a summary, what they expected and what happened, a suggested priority and the likely cause. It writes in your team’s language, whichever language the user spoke.</p>
         </div>
         <div class="ai-panel">
           <div class="ai-in">
@@ -665,14 +577,14 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
               <span class="chip-s chip-red">Priority · High</span>
             </div>
             <div class="ans a1"><span class="k">Summary</span><p>Customers in Mexico can’t save billing details: the form asks for a VAT number Mexico doesn’t use.</p></div>
-            <div class="ans a2"><span class="k">Expected vs. what happened</span><p>Details save and a confirmation appears. Instead nothing saves and the console shows “VAT number is required”.</p></div>
+            <div class="ans a2"><span class="k">Expected vs. what happened</span><p>Expected the details to save. Nothing was saved and the console shows “VAT number is required”.</p></div>
             <div class="ans cause a3"><span class="k">Likely cause</span><p>The validator requires a VAT number for every country instead of only EU ones.</p></div>
-            <div class="ans a4"><span class="k">Possible duplicate</span><p>FUN-42 · reported by 3 people this week. Illustrative example.</p></div>
+            <div class="ans a4"><span class="k">Possible duplicate</span><p>FUN-42, reported by 3 people this week. Example data.</p></div>
           </div>
         </div>
         <div class="ai-foot">
-          <span class="body" style="margin-right:6px">Also in AI Powered</span>
-          <span class="ichip">Voice transcript</span><span class="ichip">Smarter steps</span><span class="ichip">Suggested category</span><span class="ichip">Duplicate detection</span><span class="ichip">Translation</span>
+          <span class="body" style="margin-right:6px">AI Powered also adds</span>
+          <span class="ichip">Voice transcripts</span><span class="ichip">Clearer steps</span><span class="ichip">Suggested category</span><span class="ichip">Duplicate detection</span><span class="ichip">Translation</span>
         </div>
       </div>
     </div>
@@ -680,38 +592,28 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
 
   <svg class="edge" viewBox="0 0 1440 72" preserveAspectRatio="none" aria-hidden="true" style="background:var(--paper)"><path d="M0 46 C90 30 150 58 250 40 C340 24 420 52 520 36 C610 22 700 56 800 38 C900 20 990 50 1090 34 C1180 20 1260 48 1340 32 C1390 24 1420 30 1440 28 L1440 72 L0 72 Z" fill="#15121E"/></svg>
 
-  <!-- Lanes: what happens between the click and the ticket -->
-  <section class="sec night on-night" id="captured">
+  <!-- Privacy: what is always attached and what never leaves the browser -->
+  <section class="sec night on-night" id="privacy">
     <div class="wrap">
       <div class="sec-head reveal">
-        <h2 class="d2">Your users show it.<br><span style="color:var(--sun)">Lumora writes it up.</span></h2>
-        <p class="lead">What happens in the few seconds between the click and the ticket.</p>
+        <span class="eyebrow">Privacy and security</span>
+        <h2 class="d2">Complete reports, without the sensitive data.</h2>
+        <p class="lead">Technical details are always attached, and private data is removed in the user’s browser before anything is sent.</p>
       </div>
-      <div class="lanes reveal" role="table" aria-label="Who does what">
-        <div class="lanerow head" role="row"><div></div><div>Click</div><div>Show</div><div>Capture</div><div>Write up</div><div>Deliver</div></div>
-        <div class="lanerow" role="row">
-          <span class="travel" style="background:var(--sun)"></span>
-          <div class="who"><i style="background:var(--sun)"></i>Your user</div>
-          <div><span class="pill u">Click the nebula</span></div>
-          <div><span class="pill u">Mark up or record</span></div>
-          <div><span class="dash">—</span></div>
-          <div><span class="dash">—</span></div>
-          <div><span class="pill u">Get a thank-you</span></div>
+      <div class="lanes reveal">
+        <div class="keeprow">
+          <div class="who"><i style="background:var(--sun)"></i>Always attached</div>
+          <div class="chips"><span class="pill u">Console errors</span><span class="pill u">Failed requests</span><span class="pill u">The user’s last steps</span><span class="pill u">Browser, OS and screen</span><span class="pill u">User ID and plan</span></div>
         </div>
-        <div class="lanerow" role="row">
-          <span class="travel" style="background:#C9B6FF;animation-delay:-3.5s"></span>
-          <div class="who"><i style="background:#C9B6FF"></i>Lumora</div>
-          <div><span class="pill l">Notice the error</span></div>
-          <div><span class="pill l">Follow every click</span></div>
-          <div><span class="pill l">Attach the logs</span></div>
-          <div><span class="pill l">Write the steps</span></div>
-          <div><span class="pill l">Create the ticket</span></div>
+        <div class="keeprow">
+          <div class="who"><i style="background:#E5484D"></i>Never sent</div>
+          <div class="chips"><span class="pill l"><s>What users type</s></span><span class="pill l"><s>Passwords and card numbers</s></span><span class="pill l"><s>Request bodies and headers</s></span><span class="pill l"><s>E-mails and tokens in logs</s></span><span class="pill l"><s>Elements you choose to hide</s></span></div>
         </div>
       </div>
       <div class="trio">
-        <div class="reveal"><h3 class="d3">Everything a developer asks for</h3><p class="body">Console errors from before the widget opened, failed requests with method, URL, status and timing, browser, OS, screen and time zone.</p></div>
-        <div class="reveal"><h3 class="d3">Nothing they shouldn’t see</h3><p class="body">Steps say which field, never what was typed. Passwords and cards always hidden. Never request bodies or headers.</p></div>
-        <div class="reveal"><h3 class="d3">Locked down</h3><p class="body">Credentials encrypted at rest, allowed domains per key, expiring attachment links. Admins can hide elements for everyone.</p></div>
+        <div class="reveal"><h3 class="d3">Masked inputs</h3><p class="body">Steps say which field was used, never what was typed. Password and card fields are always hidden in screenshots and recordings.</p></div>
+        <div class="reveal"><h3 class="d3">Cleaned in the browser</h3><p class="body">E-mail addresses, card numbers and tokens are removed from logs and URLs before the report leaves the page.</p></div>
+        <div class="reveal"><h3 class="d3">Stored safely</h3><p class="body">Integration credentials are encrypted, each widget key only works on your domains, and attachment links expire.</p></div>
       </div>
     </div>
   </section>
@@ -724,7 +626,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       <div class="sec-head reveal">
         <span class="eyebrow">Your tools</span>
         <h2 class="d2">Tickets land where your team already works.</h2>
-        <p class="lead">Each ticket follows your template, converted to each tool’s format, with the screenshot and recording attached. Status flows back on its own.</p>
+        <p class="lead">Choose your tool and Lumora creates the ticket there, formatted the way that tool expects, with the screenshot and recording attached. Most tools also send status changes back.</p>
       </div>
       <div class="tri">
         <article class="tile bg-sky reveal">
@@ -735,17 +637,17 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
           </div></div>
           <span class="tag">Issue &amp; defect trackers</span>
           <h3 class="d3">Jira, GitHub, Azure DevOps and 7 more</h3>
-          <p class="body">Linear, GitLab, ClickUp, Asana, Shortcut, YouTrack and Trello. Bugs land in the right project with everything attached.</p>
+          <p class="body">Also Linear, GitLab, ClickUp, Asana, Shortcut, YouTrack and Trello. Bugs go to the right project with everything attached.</p>
         </article>
         <article class="tile bg-butter reveal">
           <div class="vis"><div class="bubbles">
             <span class="bubble a">The Save button does nothing.</span>
-            <span class="bubble b">Got it — the full report is attached. A fix is on its way.</span>
+            <span class="bubble b">Thanks, we have everything we need. A fix is on the way.</span>
             <span class="bubble c">Solved without a call</span>
           </div></div>
           <span class="tag">Help desks</span>
           <h3 class="d3">Zendesk, Freshdesk and HubSpot</h3>
-          <p class="body">Agents get the screenshot, steps and console inside the ticket they already work in. No more “can you send a screenshot?”.</p>
+          <p class="body">Agents see the screenshot, steps and console logs inside the ticket they are already working on.</p>
         </article>
         <article class="tile bg-lilac reveal">
           <div class="vis"><div class="blocks">
@@ -757,7 +659,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
           </div></div>
           <span class="tag">Enterprise service management</span>
           <h3 class="d3">Salesforce, ServiceNow and Freshservice</h3>
-          <p class="body">Cases and incidents created with the full context, for teams whose support runs on enterprise platforms.</p>
+          <p class="body">Cases and incidents with the full report attached, for support teams that run on these platforms.</p>
         </article>
       </div>
       <div class="duo">
@@ -785,7 +687,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       <div class="sec-head reveal">
         <span class="eyebrow">Support Center · Business</span>
         <h2 class="d2">Run support for every app from one place.</h2>
-        <p class="lead">Every report with its ticket’s live status, similar reports grouped into issues, and a dashboard that shows where people get stuck.</p>
+        <p class="lead">The Business plan adds a Support Center: every report in one list with the current status of its ticket, similar reports grouped into issues, and a dashboard that shows where users get stuck.</p>
       </div>
       <div class="duo" style="margin-top:0">
         <article class="sc-tile reveal">
@@ -798,8 +700,8 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
           </div>
           <div class="sc-body">
             <h3 class="d3">Live ticket status</h3>
-            <span class="sc-role">Synced from Jira, Zendesk, ServiceNow…</span>
-            <p class="body">Each report shows the real status of its ticket. Lumora checks every two minutes, and one-click webhooks make it instant.</p>
+            <span class="sc-role">Synced from Jira, Zendesk, ServiceNow and more</span>
+            <p class="body">Each report shows the current status of its ticket. Lumora checks every two minutes, or right away if you turn on webhooks, which takes one click for most tools.</p>
             <div class="kpis"><span class="kpi"><b>2 min</b>sync</span><span class="kpi"><b>1 click</b>webhooks</span><span class="kpi"><b>16</b>tools</span></div>
           </div>
         </article>
@@ -814,8 +716,8 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
           </div>
           <div class="sc-body">
             <h3 class="d3">Similar reports, one issue</h3>
-            <span class="sc-role">Know what hurts the most</span>
-            <p class="body">Reports with the same error are grouped even when IDs change, with how many people it affects. The dashboard adds time to resolve, top issues and problem pages.</p>
+            <span class="sc-role">See what affects the most people</span>
+            <p class="body">Reports with the same error are grouped into one issue, even when IDs or numbers in the message differ, so you can see how many people it affects. The dashboard adds time to resolve, top issues and the pages where people get stuck.</p>
             <div class="kpis"><span class="kpi"><b>32 h</b>median to resolve</span><span class="kpi"><b>Top 5</b>issues</span><span class="kpi"><b>25</b>apps</span></div>
           </div>
         </article>
@@ -831,7 +733,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
           <span class="eyebrow">Pricing</span>
           <h2 class="d2">Simple, monthly pricing.</h2>
         </div>
-        <span class="lead">14 days of Pro free · no card · cancel anytime</span>
+        <span class="lead">14 days of Pro free, no card needed. Cancel anytime.</span>
       </div>
       <div class="price-grid">
         <article class="plan reveal">
@@ -906,7 +808,7 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
       <div>
         <span class="eyebrow">Step one · free</span>
         <h2 class="d2">Let your users <span class="squiggle view">show you.<svg viewBox="0 0 300 12" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M3 8 C 40 2, 70 11, 110 6 S 180 1, 220 6 S 280 10, 297 5"/></svg></span></h2>
-        <p class="lead" style="max-width:500px">Start with 14 days of Pro. Paste one line, connect your tool and watch the first complete ticket land in under ten minutes. No card needed.</p>
+        <p class="lead" style="max-width:500px">Try Pro free for 14 days, no card needed. Most teams install the widget, connect their tool and get their first ticket in under ten minutes.</p>
       </div>
       <form class="start" id="startForm" novalidate>
         <div class="frow">
@@ -940,14 +842,14 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
         <span style="color:rgba(250,248,242,.6);font-size:14.5px;line-height:1.5">Bug reports that explain themselves.</span>
       </div>
       <div class="cols">
-        <div class="col"><span>Product</span><a href="#product">Widget</a><a href="#ai">AI Powered</a><a href="#support-center">Support Center</a><a href="#pricing">Pricing</a></div>
-        <div class="col"><span>Get started</span><a href="#start">Start free</a><a href="/app/">Sign in</a><a href="/demo/">Live demo</a></div>
+        <div class="col"><span>Product</span><a href="#how">How it works</a><a href="#ai">AI Powered</a><a href="#support-center">Support Center</a><a href="#pricing">Pricing</a></div>
+        <div class="col"><span>Get started</span><a href="#start">Start free</a><a href="/app/">Sign in</a><a href="/demo/">Try the demo</a></div>
         <div class="col"><span>Contact</span><a href="mailto:hello@lumora.app">hello@lumora.app</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">DPA</a></div>
       </div>
     </div>
     <div class="legal">
       <span>© 2026 Lumora</span>
-      <p>Jira, GitHub, Azure DevOps, Zendesk, Salesforce, ServiceNow and other product names are trademarks of their respective owners. Lumora is an independent product and is not affiliated with them.</p>
+      <p>Jira, GitHub, Azure DevOps, Zendesk, Salesforce, ServiceNow and other product names are trademarks of their owners. Lumora is not affiliated with them.</p>
     </div>
   </div>
 </footer>
@@ -1013,10 +915,10 @@ footer{background:var(--night);color:var(--paper);border-top:1px solid var(--nig
   var cv = document.getElementById('bezel'), wrap = document.getElementById('stage'), nb = document.getElementById('heroNebula');
   var capStep = document.getElementById('capStep'), capText = document.getElementById('capText');
   var caps = [
-    ['01 · Something breaks', 'A user hits a bug. The details are scattered.'],
+    ['01 · Something breaks', 'A user runs into a bug.'],
     ['02 · One click', 'They click the nebula and show what happened.'],
-    ['03 · Captured', 'Steps, console and network, gathered on their own.'],
-    ['04 · Your tools', 'A complete ticket, in the tool you already use.']
+    ['03 · Captured', 'Lumora collects the steps, console and network logs.'],
+    ['04 · Your tools', 'The ticket lands in the tool you already use.']
   ];
   if (cv && cv.getContext && nb) {
     var ctx = cv.getContext('2d'), W = 0, H = 0, S = 0, dpr = 1, CYCLE = 19000, TAU = Math.PI * 2;
