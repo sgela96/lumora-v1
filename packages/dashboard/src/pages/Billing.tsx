@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { api } from '../api';
 import { Icons } from '../components/icons';
 import { Card, PageHead, useToast } from '../components/ui';
+import { TrialButton } from '../components/TrialButton';
 import { useApp } from '../state';
 
 /** The full matrix behind "Compare all features" — the cards above stay short. */
@@ -133,6 +134,15 @@ export function BillingPage() {
       />
       {!me.server.billingEnabled && <div className="notice">Billing isn’t configured on this server (no STRIPE_SECRET_KEY), so you can switch plans and extras freely to try them.</div>}
       {returning && <PaymentStatus />}
+      {me.account.canTrial && (
+        <div className="notice notice-accent spread" style={{ gap: 16, flexWrap: 'wrap' }}>
+          <span>
+            <strong>Try Pro free for 7 days.</strong> Screen recordings that turn into steps, network logs, all 10 trackers, your own template and the dashboard. No card needed,
+            and you’re back on Free when it ends.
+          </span>
+          <TrialButton />
+        </div>
+      )}
 
       <div className="grid-3">
         {PLAN_ORDER.map((id) => {

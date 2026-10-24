@@ -51,12 +51,12 @@ export function welcomeMail(to: string, name: string, snippet: string): Mail {
     to,
     subject: 'Welcome to Lumora',
     html: `<p>Hi ${escapeHtml(name)},</p>
-<p>Your account is ready, with <b>14 days of Pro</b> to try everything. Three minutes from now your users can send complete bug reports straight into your tracker.</p>
+<p>Your account is ready on the Free plan. A few minutes from now your users can send complete bug reports straight into Jira, GitHub or Linear. Whenever you want to try screen recordings and the dashboard, start a 7-day Pro trial from Plan &amp; billing.</p>
 <p>Your install snippet:</p>
 <pre style="background:#1d1d1f;color:#f5f5f7;padding:14px 16px;border-radius:12px;font-size:12px;white-space:pre-wrap;word-break:break-all">${escapeHtml(snippet)}</pre>
 ${button(url, 'Continue the setup')}
 <p>Questions? Just reply to this e-mail.</p>`,
-    text: `Hi ${name},\n\nYour Lumora account is ready, with 14 days of Pro.\n\nInstall snippet:\n${snippet}\n\nContinue the setup: ${url}`,
+    text: `Hi ${name},\n\nYour Lumora account is ready on the Free plan. You can try Pro for 7 days from Plan & billing whenever you like.\n\nInstall snippet:\n${snippet}\n\nContinue the setup: ${url}`,
   };
 }
 

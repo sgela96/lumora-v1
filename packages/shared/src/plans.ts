@@ -87,6 +87,8 @@ const MESSAGING: IntegrationType[] = INTEGRATION_CATEGORIES.messaging.types;
 const TRACKERS: IntegrationType[] = INTEGRATION_CATEGORIES.trackers.types;
 const HELPDESKS: IntegrationType[] = INTEGRATION_CATEGORIES.helpdesks.types;
 const ENTERPRISE: IntegrationType[] = INTEGRATION_CATEGORIES.enterprise.types;
+/** Free can send its one destination to a real tracker, so the first ticket lands where the team works. */
+export const FREE_TRACKERS: IntegrationType[] = ['jira', 'github', 'linear'];
 
 export const PLANS: Record<PlanId, PlanLimits> = {
   free: {
@@ -99,7 +101,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     aiReportsPerMonth: 0,
     destinationsPerProject: 1,
     historyDays: 0,
-    integrations: MESSAGING,
+    integrations: [...FREE_TRACKERS, ...MESSAGING],
     features: {
       screenshot: true,
       annotation: true,
@@ -119,7 +121,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       basicDashboard: false,
       supportCenter: false,
     },
-    highlights: ['1 app · 25 reports a month', 'Screenshots with markup', 'Console & browser details attached', 'Slack, webhook or e-mail'],
+    highlights: ['1 app · 25 reports a month', 'Screenshots with markup', 'Console & browser details attached', 'One destination: Jira, GitHub, Linear, Slack or e-mail'],
     addons: [],
   },
   pro: {

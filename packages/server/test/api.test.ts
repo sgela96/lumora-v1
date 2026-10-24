@@ -48,9 +48,11 @@ test('register → project → widget config → report → ticket', async () =>
   assert.equal(reg.status, 201);
 
   const me = await call('/api/me');
-  assert.equal(me.body.account.plan, 'pro');
-  assert.equal(me.body.account.planStatus, 'trialing');
-  // Pro: basic dashboard, no repository.
+  assert.equal(me.body.account.plan, 'free');
+  assert.equal(me.body.account.planStatus, 'active');
+  assert.equal(me.body.account.canTrial, true);
+  // Pro (via the opt-in trial): basic dashboard, no repository.
+  assert.equal((await call('/api/billing/trial', { body: {} })).status, 200);
   const [firstProject] = (await call('/api/projects')).body;
   assert.equal((await call(`/api/projects/${firstProject.id}/metrics`)).body.level, 'basic');
   assert.equal((await call(`/api/projects/${firstProject.id}/tickets`)).status, 402);
@@ -97,14 +99,14 @@ test('allowed origins and plan limits are enforced', async () => {
   assert.equal(allowed.status, 200);
   assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://app.acme.com');
 
-  // Downgrade to Free: no recording, no trackers, no dashboard.
+  // Downgrade to Free: no recording, one of three trackers only, no dashboard.
   assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'free' } })).status, 200);
   const cfg = await fetch(`${base}/api/widget/config?key=${project.publicKey}`, { headers: { Origin: 'https://acme.com' } }).then((r) => r.json());
   assert.equal(cfg.settings.reportTypes.recording, false);
-  const jiraOnFree = await call(`/api/projects/${project.id}/integrations`, {
-    body: { type: 'jira', config: { siteUrl: 'https://x.atlassian.net', email: 'a@b.c', apiToken: 't', projectKey: 'SUP' } },
+  const azureOnFree = await call(`/api/projects/${project.id}/integrations`, {
+    body: { type: 'azure_devops', config: { organization: 'acme', project: 'Web', token: 't' } },
   });
-  assert.equal(jiraOnFree.status, 402);
+  assert.equal(azureOnFree.status, 402);
   const zendesk = await call(`/api/projects/${project.id}/integrations`, {
     body: { type: 'zendesk', config: { subdomain: 'acme', email: 'a@b.c', apiToken: 't' } },
   });
@@ -338,4 +340,26 @@ test('status webhook is created in GitHub with one click and removed with the in
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test('new accounts start on Free and can opt into one 7-day Pro trial', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Tia', company: 'Tyrell', email: 'tia@tyrell.test', password: 'password123' } });
+  let me = (await call('/api/me')).body;
+  assert.equal(me.account.plan, 'free');
+  assert.equal(me.account.trialEndsAt, null);
+  assert.ok(me.limits.integrations.includes('jira'), 'Free can connect Jira');
+  assert.ok(!me.limits.integrations.includes('azure_devops'));
+
+  const started = await call('/api/billing/trial', { body: {} });
+  assert.equal(started.status, 200);
+  me = (await call('/api/me')).body;
+  assert.equal(me.account.plan, 'pro');
+  assert.equal(me.account.planStatus, 'trialing');
+  assert.equal(me.account.canTrial, false);
+  const days = (new Date(me.account.trialEndsAt).getTime() - Date.now()) / 86400_000;
+  assert.ok(days > 6.9 && days <= 7, `trial lasts 7 days, got ${days}`);
+  assert.notEqual(me.account.planKey, me.account.onboarding.seenPlan, 'starting a trial is celebrated once');
+
+  assert.equal((await call('/api/billing/trial', { body: {} })).status, 409, 'only one trial per account');
 });

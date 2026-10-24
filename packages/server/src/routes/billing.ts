@@ -5,7 +5,7 @@ import { requireJsonForMutations, requireUser } from '../auth';
 import { billingEnabled, config } from '../config';
 import { one, run } from '../db';
 import { planActivatedMail, sendMail } from '../lib/mail';
-import { getAccount, HttpError } from '../services';
+import { canStartTrial, getAccount, HttpError } from '../services';
 
 // Stripe is called over its REST API directly: a handful of endpoints and a webhook don't justify the SDK.
 
@@ -200,6 +200,15 @@ export function billingRouter(): Router {
       return_url: `${config.publicUrl}/app/#/billing`,
     });
     res.json({ url: session.url });
+  });
+
+  /** Opt-in Pro trial: once per account, no card. When it ends the account is back on Free. */
+  router.post('/trial', (req, res) => {
+    const account = getAccount(req.user!.accountId);
+    if (!canStartTrial(account)) throw new HttpError(409, account.trial_ends_at ? 'You’ve already used your Pro trial' : 'Your account is already on a paid plan');
+    const ends = new Date(Date.now() + config.trialDays * 86400_000).toISOString();
+    run(`UPDATE accounts SET plan = 'pro', plan_status = 'trialing', trial_ends_at = ? WHERE id = ?`, ends, account.id);
+    res.json({ ok: true, trialEndsAt: ends });
   });
 
   /** Without Stripe (local / self-hosted demo) plans and add-ons can be switched freely to try every tier. */

@@ -110,7 +110,7 @@ export function AuthPage({ onDone }: { onDone: () => void }) {
 
 const TITLES: Record<Mode, [string, string, string]> = {
   login: ['Welcome back', 'Sign in to Lumora', 'Sign in'],
-  register: ['Start your free trial', '14 days of Pro, no card required', 'Create account'],
+  register: ['Create your free account', 'Free forever. Try Pro for 7 days whenever you like.', 'Create account'],
   forgot: ['Reset your password', 'We’ll e-mail you a link to choose a new one', 'Send the link'],
   reset: ['Choose a new password', 'Then you’re straight back in', 'Save and sign in'],
 };

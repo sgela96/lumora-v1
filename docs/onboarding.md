@@ -6,7 +6,7 @@ Objetivo: que un cliente pase de "me registré" a "recibí mi primer ticket comp
 
 | Momento | Qué pasa | Estado |
 |---|---|---|
-| **Registro** | Cuenta + primera app creadas, 14 días de Pro. E-mail de bienvenida con el snippet y un link para seguir el setup. Se abre el **Setup wizard**. | ✅ |
+| **Registro** | Cuenta + primera app creadas, en Free. E-mail de bienvenida con el snippet y un link para seguir el setup. Se abre el **Setup wizard**. | ✅ |
 | **Setup wizard** (4 pasos) | 1. Tu app (nombre y dominio permitido). 2. Instalar (snippet por stack + detección en vivo cuando el widget carga en su sitio). 3. Conectar tu herramienta (Jira, GitHub…, con prueba de conexión). 4. Enviar un reporte de prueba (detección en vivo del primer ticket + celebración). Se puede saltear y retomar. | ✅ |
 | **Checklist "Getting started"** | Tarjeta en el Overview con los 4 pasos y su progreso hasta completarlos. | ✅ |
 | **Tour guiado** | Diálogos que señalan cada sección (Overview, Reports, Settings, Plan & billing, Help) y explican qué hace. Cambia según el plan. Se ofrece al terminar el setup y desde Help. | ✅ |
@@ -14,6 +14,7 @@ Objetivo: que un cliente pase de "me registré" a "recibí mi primer ticket comp
 | **Cambio de extras** | Mismo modal con lo nuevo (ej. AI Powered). | ✅ |
 | **Olvidé mi contraseña** | Link en el login → e-mail con link de un solo uso (1 hora) → nueva contraseña y adentro. | ✅ |
 | **Setup sin terminar** | Si lo saltea, un banner y el checklist del Overview lo invitan a retomarlo. | ✅ |
+| **Prueba de Pro (opcional)** | Botón "Try Pro free for 7 days" en la barra lateral, en Plan & billing y en el Overview de Free. Una vez por cuenta, sin tarjeta; al empezar se muestra el modal de bienvenida a Pro. | ✅ |
 | **Fin de la prueba** | Aviso 3 días antes (banner) y e-mail; al vencer baja a Free sin romper el widget. | Banner ✅ · e-mail: pendiente (job diario) |
 
 ## 2. Ayuda
