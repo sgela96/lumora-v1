@@ -44,14 +44,27 @@ export const config = {
     secretKey: env('STRIPE_SECRET_KEY'),
     webhookSecret: env('STRIPE_WEBHOOK_SECRET'),
     prices: {
-      starter: env('STRIPE_PRICE_STARTER'),
+      free: '',
       pro: env('STRIPE_PRICE_PRO'),
       business: env('STRIPE_PRICE_BUSINESS'),
+    },
+    addonPrices: {
+      ai: env('STRIPE_PRICE_ADDON_AI'),
+      helpdesks: env('STRIPE_PRICE_ADDON_HELPDESKS'),
+      long_recordings: env('STRIPE_PRICE_ADDON_LONG_RECORDINGS'),
+      extra_app: env('STRIPE_PRICE_ADDON_EXTRA_APP'),
+      extra_reports: env('STRIPE_PRICE_ADDON_EXTRA_REPORTS'),
     },
   },
   smtp: {
     url: env('SMTP_URL'),
     from: env('SMTP_FROM', 'Lumora <reports@lumora.app>'),
+  },
+  /** Speech-to-text for AI Powered voice transcripts: 'deepgram' or 'openai'. */
+  transcription: {
+    provider: env('LUMORA_STT_PROVIDER', 'deepgram'),
+    deepgramKey: env('DEEPGRAM_API_KEY'),
+    openaiKey: env('OPENAI_API_KEY'),
   },
   anthropic: {
     apiKey: env('ANTHROPIC_API_KEY'),

@@ -4,7 +4,7 @@ export const STYLES = /* css */ `
 :host { all: initial; }
 * { box-sizing: border-box; }
 .lu-root {
-  --lu-accent: #F4C152;
+  --lu-accent: #FFD666;
   --lu-accent-soft: #FDF1D2;
   --lu-on-accent: #3A2A00;
   --lu-bg: rgba(255, 255, 255, .86);
@@ -185,6 +185,8 @@ ${NEBULA_CSS}
 .lu-error-text { color: var(--lu-danger); font-size: 12px; margin-top: 5px; }
 .lu-check { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
 .lu-check input { accent-color: var(--lu-accent); width: 16px; height: 16px; }
+.lu-mic-row { margin: 2px 4px 0; color: var(--lu-muted); font-size: 12.5px; }
+.lu-mic { display: inline-grid; color: var(--lu-muted); }
 
 /* Segmented control for short choice fields */
 .lu-segmented { display: flex; padding: 2px; border-radius: 10px; background: var(--lu-surface); }
@@ -246,9 +248,9 @@ ${NEBULA_CSS}
 .lu-btn:disabled { opacity: .55; cursor: default; }
 .lu-btn-primary {
   width: 100%; margin-top: 18px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--lu-accent) 78%, #fff), var(--lu-accent));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lu-accent) 60%, #fffbe8), var(--lu-accent));
   color: var(--lu-on-accent);
-  box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 6px 16px -6px color-mix(in srgb, var(--lu-accent) 70%, transparent);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 8px 20px -8px color-mix(in srgb, var(--lu-accent) 85%, transparent);
 }
 .lu-btn-primary:hover:not(:disabled) { filter: brightness(1.03) saturate(1.05); }
 .lu-btn-ghost { background: var(--lu-surface); color: var(--lu-text); padding: 8px 12px; font-size: 13px; border-radius: 10px; }

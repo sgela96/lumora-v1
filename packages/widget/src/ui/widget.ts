@@ -38,6 +38,7 @@ interface RecordingState {
   url: string;
   durationMs: number;
   actions: UserAction[];
+  hasAudio: boolean;
 }
 
 export interface WidgetDeps {
@@ -76,6 +77,8 @@ export class Widget {
   private errorMessage = '';
   private recorder?: ScreenRecorder;
   private recordingActions: UserAction[] = [];
+  /** "Include my voice" — on by default when the site allows the microphone. */
+  private micOn = true;
   private stopActionListener?: () => void;
   private proactiveShown = false;
   private moodTimer?: number;
@@ -291,6 +294,14 @@ export class Widget {
       const max = this.deps.config.settings.recording.maxSeconds;
       list.append(option(icons.video, t.optRecord, t.optRecordHint, () => this.startRecording(), max ? t.limit(max) : undefined));
     }
+    if (types.recording && isRecordingSupported() && this.deps.config.settings.recording.allowMicrophone) {
+      const mic = el('input', { type: 'checkbox' });
+      mic.checked = this.micOn;
+      mic.addEventListener('change', () => (this.micOn = mic.checked));
+      const micIcon = el('span', { class: 'lu-mic' });
+      micIcon.innerHTML = icons.mic;
+      list.append(el('label', { class: 'lu-check lu-mic-row' }, [mic, micIcon, this.t.micOn]));
+    }
     if (types.describe) list.append(option(icons.pencil, t.optDescribe, t.optDescribeHint, () => { this.kind = 'describe'; this.setView('form'); }));
     if (this.notice) list.append(el('div', { class: 'lu-notice', text: this.notice }));
     return list;
@@ -497,7 +508,7 @@ export class Widget {
     try {
       await recorder.start({
         maxSeconds: s.recording.maxSeconds,
-        microphone: s.recording.allowMicrophone,
+        microphone: s.recording.allowMicrophone && this.micOn,
         onTick: (ms) => this.updateRecbar(ms),
         onAutoStop: () => this.stopRecording(),
       });
@@ -521,7 +532,7 @@ export class Widget {
     this.recbar.hidden = true;
     const result = await recorder.stop();
     if (this.recording) URL.revokeObjectURL(this.recording.url);
-    this.recording = { blob: result.blob, url: URL.createObjectURL(result.blob), durationMs: result.durationMs, actions: this.recordingActions };
+    this.recording = { blob: result.blob, url: URL.createObjectURL(result.blob), durationMs: result.durationMs, actions: this.recordingActions, hasAudio: result.hasAudio };
     this.kind = 'recording';
     this.showLauncher();
     this.open('describe');
@@ -630,6 +641,7 @@ export class Widget {
     if (c.breadcrumbs) payload.breadcrumbs = this.deps.actions.recent(20).map(cleanAction);
     if (this.recording) {
       payload.recordingDurationMs = this.recording.durationMs;
+      payload.recordingHasAudio = this.recording.hasAudio;
       if (c.recordingSteps) payload.recordingActions = this.recording.actions.map(cleanAction);
     }
     return payload;

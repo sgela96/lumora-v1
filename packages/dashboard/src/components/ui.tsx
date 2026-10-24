@@ -48,6 +48,7 @@ export function ToggleRow({
   checked,
   onChange,
   lockedTo,
+  lockLabel,
   children,
 }: {
   title: string;
@@ -56,6 +57,8 @@ export function ToggleRow({
   onChange: (v: boolean) => void;
   /** When set, the feature isn't in the current plan: show which plan unlocks it. */
   lockedTo?: PlanId;
+  /** Badge text when the feature is unlocked by an extra rather than a plan. */
+  lockLabel?: string;
   children?: ReactNode;
 }) {
   return (
@@ -63,7 +66,7 @@ export function ToggleRow({
       <div className="text">
         <div className="row" style={{ gap: 8 }}>
           <strong>{title}</strong>
-          {lockedTo && <UpgradeBadge plan={lockedTo} />}
+          {lockedTo && <UpgradeBadge plan={lockedTo} label={lockLabel} />}
         </div>
         {description && <span className="hint">{description}</span>}
         {children && checked && !lockedTo && <div style={{ marginTop: 10 }}>{children}</div>}
@@ -73,10 +76,10 @@ export function ToggleRow({
   );
 }
 
-export function UpgradeBadge({ plan }: { plan: PlanId }) {
+export function UpgradeBadge({ plan, label }: { plan: PlanId; label?: string }) {
   return (
-    <a href="#/billing" className="badge badge-accent" style={{ textDecoration: 'none' }} title={`Available on ${PLANS[plan].name}`}>
-      {PLANS[plan].name}
+    <a href="#/billing" className="badge badge-accent" style={{ textDecoration: 'none' }} title={label ?? `Available on ${PLANS[plan].name}`}>
+      {label ?? PLANS[plan].name}
     </a>
   );
 }
@@ -179,16 +182,16 @@ export function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; sa
 }
 
 /** Shown over a Business-only screen for other plans, with the real UI blurred behind it. */
-export function Upsell({ title, children }: { title: string; children: ReactNode }) {
+export function Upsell({ title, children, cta = 'Upgrade to Business' }: { title: string; children: ReactNode; cta?: string }) {
   return (
-    <div className="upsell card">
+    <div className="upsell card iris-border">
       <Nebula className="mark" />
       <h2>{title}</h2>
       <p className="muted" style={{ margin: '8px 0 18px' }}>
         {children}
       </p>
       <a className="btn btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
-        <Icons.lock size={15} /> Upgrade to Business
+        <Icons.lock size={15} /> {cta}
       </a>
     </div>
   );

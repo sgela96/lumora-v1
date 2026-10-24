@@ -102,11 +102,37 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
         </div>
       </div>
 
-      {ticket.aiSummary && (
-        <div className="notice notice-accent">
-          <strong>Summary · </strong>
-          {ticket.aiSummary}
-        </div>
+      {ticket.ai && (
+        <section className="card card-pad ai-card iris-border">
+          <div className="spread" style={{ marginBottom: 10 }}>
+            <span className="ai-label">AI Powered</span>
+            <span className="row small">
+              <span className={`badge ${ticket.ai.priority === 'urgent' || ticket.ai.priority === 'high' ? 'badge-danger' : 'badge-warn'}`}>
+                Priority · {ticket.ai.priority[0].toUpperCase() + ticket.ai.priority.slice(1)}
+              </span>
+              {ticket.ai.duplicateOf && <span className="badge badge-info">Possible duplicate of {ticket.ai.duplicateOf}</span>}
+            </span>
+          </div>
+          <p style={{ fontSize: 15 }}>{ticket.ai.summary}</p>
+          {(ticket.ai.expected || ticket.ai.actual) && (
+            <div className="grid-2" style={{ marginTop: 14 }}>
+              <div>
+                <div className="label">Expected</div>
+                <div className="small">{ticket.ai.expected || '—'}</div>
+              </div>
+              <div>
+                <div className="label">What happened</div>
+                <div className="small">{ticket.ai.actual || '—'}</div>
+              </div>
+            </div>
+          )}
+          {ticket.ai.technicalHint && (
+            <div className="notice" style={{ marginTop: 14 }}>
+              <strong>Likely cause · </strong>
+              {ticket.ai.technicalHint}
+            </div>
+          )}
+        </section>
       )}
 
       <div className="tabs" role="tablist">
@@ -156,6 +182,22 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
             </Card>
           </div>
           <div className="stack">
+            {ticket.transcript && (
+              <Card title="What they said">
+                <div className="transcript small">
+                  {ticket.transcript.segments.length ? (
+                    ticket.transcript.segments.map((s, i) => (
+                      <div key={i}>
+                        <span className="muted mono">{formatOffset(s.start * 1000)}</span>
+                        <span>{s.text}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p>{ticket.transcript.text}</p>
+                  )}
+                </div>
+              </Card>
+            )}
             {ticket.steps.length > 0 && (
               <Card title={p.recordingActions?.length ? 'Steps to reproduce' : 'What they did before reporting'}>
                 <ol className="steps">

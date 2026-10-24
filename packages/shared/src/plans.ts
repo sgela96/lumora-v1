@@ -47,9 +47,11 @@ export interface PlanLimits {
   tagline: string;
   projects: number;
   reportsPerMonth: number;
+  /** Reports per month processed by AI Powered (transcription, summary, triage). */
+  aiReportsPerMonth: number;
   /** Active ticket destinations per project. */
   destinationsPerProject: number;
-  /** How far back the Reports list goes (days). */
+  /** How far back the report repository goes (days). */
   historyDays: number;
   integrations: IntegrationType[];
   features: {
@@ -61,17 +63,24 @@ export interface PlanLimits {
     console: boolean;
     network: boolean;
     breadcrumbs: boolean;
+    /** Written steps from the user's clicks during a recording (deterministic, no AI). */
     recordingSteps: boolean;
+    /** AI Powered: voice transcript, summary, improved steps, triage, duplicates, translation. */
     aiSteps: boolean;
     customTemplate: boolean;
     userIdentity: boolean;
     removeBranding: boolean;
     redactionRules: boolean;
     routingByCategory: boolean;
-    /** Support Center: metrics dashboard, status sync with linked tickets, issue grouping, saved views. */
+    /** Basic dashboard: volume, trend, categories, latest reports. */
+    basicDashboard: boolean;
+    /** Support Center: report repository, status sync, issue grouping, advanced dashboard. */
     supportCenter: boolean;
   };
+  /** Short pitch for pricing cards ("Everything in Free, plus…"). */
   highlights: string[];
+  /** Add-ons that can be bought on top of this plan. */
+  addons: AddonId[];
 }
 
 const MESSAGING: IntegrationType[] = INTEGRATION_CATEGORIES.messaging.types;
@@ -80,13 +89,47 @@ const HELPDESKS: IntegrationType[] = INTEGRATION_CATEGORIES.helpdesks.types;
 const ENTERPRISE: IntegrationType[] = INTEGRATION_CATEGORIES.enterprise.types;
 
 export const PLANS: Record<PlanId, PlanLimits> = {
-  starter: {
-    id: 'starter',
-    name: 'Starter',
-    priceMonthlyUsd: 19,
-    tagline: 'Complete bug reports, straight into your tracker.',
+  free: {
+    id: 'free',
+    name: 'Free',
+    priceMonthlyUsd: 0,
+    tagline: 'Try the widget',
     projects: 1,
-    reportsPerMonth: 150,
+    reportsPerMonth: 25,
+    aiReportsPerMonth: 0,
+    destinationsPerProject: 1,
+    historyDays: 0,
+    integrations: MESSAGING,
+    features: {
+      screenshot: true,
+      annotation: true,
+      recording: false,
+      recordingMaxSeconds: 0,
+      microphone: false,
+      console: true,
+      network: false,
+      breadcrumbs: false,
+      recordingSteps: false,
+      aiSteps: false,
+      customTemplate: false,
+      userIdentity: true,
+      removeBranding: false,
+      redactionRules: false,
+      routingByCategory: false,
+      basicDashboard: false,
+      supportCenter: false,
+    },
+    highlights: ['1 app · 25 reports a month', 'Screenshots with markup', 'Console & browser details attached', 'Slack, webhook or e-mail'],
+    addons: [],
+  },
+  pro: {
+    id: 'pro',
+    name: 'Pro',
+    priceMonthlyUsd: 49,
+    tagline: 'The complete bug report',
+    projects: 1,
+    reportsPerMonth: 500,
+    aiReportsPerMonth: 0,
     destinationsPerProject: 1,
     historyDays: 30,
     integrations: [...TRACKERS, ...MESSAGING],
@@ -94,42 +137,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       screenshot: true,
       annotation: true,
       recording: true,
-      recordingMaxSeconds: 60,
-      microphone: false,
-      console: true,
-      network: true,
-      breadcrumbs: true,
-      recordingSteps: true,
-      aiSteps: false,
-      customTemplate: false,
-      userIdentity: true,
-      removeBranding: false,
-      redactionRules: false,
-      routingByCategory: false,
-      supportCenter: false,
-    },
-    highlights: [
-      '1 app, 150 reports / month',
-      'Screenshots, 1-min recordings → written steps',
-      'Console, network & environment, always attached',
-      'Jira, Azure DevOps, GitHub, GitLab, Linear & more',
-    ],
-  },
-  pro: {
-    id: 'pro',
-    name: 'Pro',
-    priceMonthlyUsd: 59,
-    tagline: 'For product and support teams shipping every week.',
-    projects: 5,
-    reportsPerMonth: 1500,
-    destinationsPerProject: 3,
-    historyDays: 90,
-    integrations: [...TRACKERS, ...HELPDESKS, ...MESSAGING],
-    features: {
-      screenshot: true,
-      annotation: true,
-      recording: true,
-      recordingMaxSeconds: 300,
+      recordingMaxSeconds: 120,
       microphone: true,
       console: true,
       network: true,
@@ -141,23 +149,26 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       removeBranding: true,
       redactionRules: false,
       routingByCategory: false,
+      basicDashboard: true,
       supportCenter: false,
     },
     highlights: [
-      '5 apps, 1,500 reports / month',
-      '5-min recordings with narration',
-      'Custom ticket templates, your branding',
-      '+ Zendesk, Freshdesk, HubSpot',
-      'Up to 3 destinations per app',
+      'Screen recording with voice → written steps',
+      'Console, network & user steps attached',
+      'Tickets in Jira, GitHub, Azure DevOps & 7 more',
+      'Your template, your brand, a basic dashboard',
+      'Add extras whenever you need them',
     ],
+    addons: ['extra_app', 'extra_reports', 'helpdesks', 'long_recordings', 'ai'],
   },
   business: {
     id: 'business',
     name: 'Business',
-    priceMonthlyUsd: 179,
-    tagline: 'A support command center for every app you run.',
+    priceMonthlyUsd: 149,
+    tagline: 'Your support command center',
     projects: 25,
-    reportsPerMonth: 15000,
+    reportsPerMonth: 10000,
+    aiReportsPerMonth: 2000,
     destinationsPerProject: 10,
     historyDays: 730,
     integrations: [...TRACKERS, ...HELPDESKS, ...ENTERPRISE, ...MESSAGING],
@@ -177,23 +188,106 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       removeBranding: true,
       redactionRules: true,
       routingByCategory: true,
+      basicDashboard: true,
       supportCenter: true,
     },
     highlights: [
-      'Support Center: live dashboard & report repository',
-      'Status synced back from Jira, Zendesk, ServiceNow…',
+      'Everything in Pro, with every extra included',
+      'Report repository with each ticket’s live status',
       'Similar reports grouped into issues',
-      'AI-written steps & summaries',
-      '+ Salesforce, ServiceNow, Freshservice',
-      '25 apps, 15,000 reports / month',
+      'Advanced dashboard & AI Powered reports',
+      'Salesforce, ServiceNow & Freshservice',
     ],
+    addons: [],
   },
 };
 
-export const PLAN_ORDER: PlanId[] = ['starter', 'pro', 'business'];
+// ---------------------------------------------------------------- Add-ons
+
+export type AddonId = 'extra_app' | 'extra_reports' | 'helpdesks' | 'long_recordings' | 'ai';
+
+export interface Addon {
+  id: AddonId;
+  name: string;
+  priceMonthlyUsd: number;
+  description: string;
+  /** Can be bought more than once (extra apps, extra reports). */
+  stackable: boolean;
+}
+
+export const ADDONS: Record<AddonId, Addon> = {
+  ai: {
+    id: 'ai',
+    name: 'AI Powered',
+    priceMonthlyUsd: 29,
+    description: 'Voice transcripts, summaries, smarter steps, suggested priority, duplicate detection and translation — 500 reports a month.',
+    stackable: false,
+  },
+  helpdesks: {
+    id: 'helpdesks',
+    name: 'Help desks',
+    priceMonthlyUsd: 19,
+    description: 'Zendesk, Freshdesk and HubSpot, and up to 3 destinations per app.',
+    stackable: false,
+  },
+  long_recordings: {
+    id: 'long_recordings',
+    name: 'Longer recordings',
+    priceMonthlyUsd: 9,
+    description: 'Screen recordings up to 10 minutes.',
+    stackable: false,
+  },
+  extra_app: {
+    id: 'extra_app',
+    name: 'Extra app',
+    priceMonthlyUsd: 15,
+    description: 'One more app with its own widget and settings.',
+    stackable: true,
+  },
+  extra_reports: {
+    id: 'extra_reports',
+    name: '+1,000 reports',
+    priceMonthlyUsd: 15,
+    description: '1,000 more reports a month.',
+    stackable: true,
+  },
+};
+
+export const ADDON_ORDER: AddonId[] = ['ai', 'helpdesks', 'long_recordings', 'extra_app', 'extra_reports'];
+
+export type AddonQuantities = Partial<Record<AddonId, number>>;
+
+export function isAddonId(value: unknown): value is AddonId {
+  return typeof value === 'string' && value in ADDONS;
+}
+
+/** Plan limits with the account's add-ons applied. Add-ons a plan can't take are ignored. */
+export function effectiveLimits(plan: PlanId, addons: AddonQuantities = {}): PlanLimits {
+  const base = PLANS[plan];
+  const limits: PlanLimits = structuredClone(base);
+  const qty = (id: AddonId) => (base.addons.includes(id) ? Math.max(0, Math.floor(addons[id] ?? 0)) : 0);
+  limits.projects += qty('extra_app');
+  limits.reportsPerMonth += 1000 * qty('extra_reports');
+  if (qty('helpdesks')) {
+    limits.integrations = [...new Set([...limits.integrations, ...HELPDESKS])];
+    limits.destinationsPerProject = Math.max(limits.destinationsPerProject, 3);
+  }
+  if (qty('long_recordings')) limits.features.recordingMaxSeconds = Math.max(limits.features.recordingMaxSeconds, 600);
+  if (qty('ai')) {
+    limits.features.aiSteps = true;
+    limits.aiReportsPerMonth = Math.max(limits.aiReportsPerMonth, 500);
+  }
+  return limits;
+}
+
+export function monthlyPrice(plan: PlanId, addons: AddonQuantities = {}): number {
+  return PLANS[plan].priceMonthlyUsd + PLANS[plan].addons.reduce((sum, id) => sum + ADDONS[id].priceMonthlyUsd * Math.max(0, addons[id] ?? 0), 0);
+}
+
+export const PLAN_ORDER: PlanId[] = ['free', 'pro', 'business'];
 
 export function isPlanId(value: unknown): value is PlanId {
-  return value === 'starter' || value === 'pro' || value === 'business';
+  return value === 'free' || value === 'pro' || value === 'business';
 }
 
 /** The cheapest plan that unlocks a feature — used for upsell hints in the dashboard. */
@@ -203,4 +297,11 @@ export function minimumPlanFor(feature: keyof PlanLimits['features']): PlanId {
 
 export function minimumPlanForIntegration(type: IntegrationType): PlanId {
   return PLAN_ORDER.find((id) => PLANS[id].integrations.includes(type)) ?? 'business';
+}
+
+/** Add-on that unlocks a feature on Pro, if any — so upsells can say "add AI Powered". */
+export function addonFor(feature: keyof PlanLimits['features'] | 'helpdesks'): AddonId | undefined {
+  if (feature === 'aiSteps') return 'ai';
+  if (feature === 'helpdesks') return 'helpdesks';
+  return undefined;
 }

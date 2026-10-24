@@ -1,7 +1,7 @@
 import { PLANS, type TicketStatus } from '@lumora/shared';
 import { getConnector } from './connectors';
 import { all, one, run } from './db';
-import { accountPlan, getAccount, integrationConfig, type Delivery, type IntegrationRow, type ProjectRow, type TicketRow } from './services';
+import { accountLimits, getAccount, integrationConfig, type Delivery, type IntegrationRow, type ProjectRow, type TicketRow } from './services';
 
 // Keeps each report's status in step with the ticket it created in Jira, Zendesk, ServiceNow…
 // Polling covers every tool; inbound webhooks (see routes/hooks.ts) make it near-instant.
@@ -14,7 +14,7 @@ const MAX_PER_RUN = 300;
 export function supportCenterEnabled(projectId: string): boolean {
   const project = one<ProjectRow>('SELECT * FROM projects WHERE id = ?', projectId);
   if (!project) return false;
-  return PLANS[accountPlan(getAccount(project.account_id))].features.supportCenter;
+  return accountLimits(getAccount(project.account_id)).features.supportCenter;
 }
 
 /** Reads the status of every linked ticket of a report and derives the report's status. */

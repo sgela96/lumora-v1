@@ -2,6 +2,8 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  ADDON_ORDER,
+  ADDONS,
   defaultSettings,
   mergeSettings,
   PLANS,
@@ -14,9 +16,12 @@ import { config } from '../config';
 import { connectorCatalog, getConnector } from '../connectors';
 import { all, one, run, transaction } from '../db';
 import { aiAvailable } from '../lib/ai';
+import { transcriptionAvailable } from '../lib/transcribe';
 import { centerRouter } from './center';
 import { hashPassword, id, randomToken, verifyPassword } from '../lib/crypto';
 import {
+  accountAddons,
+  accountLimits,
   accountPlan,
   canUseIntegration,
   deliverTicket,
@@ -24,6 +29,7 @@ import {
   getOwnedProject,
   HttpError,
   integrationConfig,
+  monthlyAiUsage,
   monthlyUsage,
   sealConfig,
   serializeIntegration,
@@ -92,24 +98,27 @@ export function appRouter(): Router {
         id: account.id,
         name: account.name,
         plan,
+        chosenPlan: account.plan,
+        addons: accountAddons(account),
         planStatus: account.plan_status,
         trialEndsAt: account.trial_ends_at,
         active: subscriptionActive(account),
         hasBillingCustomer: !!account.stripe_customer_id,
       },
-      limits: PLANS[plan],
-      usage: { month: new Date().toISOString().slice(0, 7), reports: monthlyUsage(account.id) },
+      limits: accountLimits(account),
+      usage: { month: new Date().toISOString().slice(0, 7), reports: monthlyUsage(account.id), aiReports: monthlyAiUsage(account.id) },
       server: {
         publicUrl: config.publicUrl,
         billingEnabled: !!config.stripe.secretKey,
         aiAvailable: aiAvailable(),
+        transcriptionAvailable: transcriptionAvailable(),
         emailAvailable: !!config.smtp.url,
       },
     });
   });
 
   router.get('/catalog', (_req, res) => {
-    res.json({ plans: PLANS, integrations: connectorCatalog(), templateVariables: TEMPLATE_VARIABLES, defaults: defaultSettings() });
+    res.json({ plans: PLANS, addons: ADDONS, addonOrder: ADDON_ORDER, integrations: connectorCatalog(), templateVariables: TEMPLATE_VARIABLES, defaults: defaultSettings() });
   });
 
   // ------------------------------------------------------------ Projects
@@ -127,7 +136,7 @@ export function appRouter(): Router {
   router.post('/projects', (req, res) => {
     const account = getAccount(req.user!.accountId);
     const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM projects WHERE account_id = ?', account.id)!.n;
-    if (count >= PLANS[accountPlan(account)].projects) throw new HttpError(402, 'Your plan does not include more sites. Upgrade to add another one.', 'upgrade');
+    if (count >= accountLimits(account).projects) throw new HttpError(402, 'Your plan does not include more apps. Add an extra app or upgrade.', 'upgrade');
     const name = str(req.body.name, 80);
     if (!name) throw new HttpError(400, 'Name is required');
     const project = createProject(account.id, name);
@@ -180,13 +189,13 @@ export function appRouter(): Router {
 
   router.post('/projects/:id/integrations', (req, res) => {
     const project = getOwnedProject(req.user!.accountId, req.params.id);
-    const plan = accountPlan(getAccount(req.user!.accountId));
+    const limits = accountLimits(getAccount(req.user!.accountId));
     const type = str(req.body.type, 30);
     const connector = getConnector(type);
     if (!connector) throw new HttpError(400, 'Unknown integration type');
-    if (!canUseIntegration(plan, type)) throw new HttpError(402, `${connector.label} is not included in your plan`, 'upgrade');
+    if (!canUseIntegration(limits, type)) throw new HttpError(402, `${connector.label} is not included in your plan`, 'upgrade');
     const active = one<{ n: number }>('SELECT COUNT(*) AS n FROM integrations WHERE project_id = ? AND enabled = 1', project.id)!.n;
-    if (active >= PLANS[plan].destinationsPerProject) throw new HttpError(402, `Your plan allows ${PLANS[plan].destinationsPerProject} destination(s) per site`, 'upgrade');
+    if (active >= limits.destinationsPerProject) throw new HttpError(402, `Your plan allows ${limits.destinationsPerProject} destination(s) per app`, 'upgrade');
     const cfg = cleanConfig(type, req.body.config, {});
     const row: IntegrationRow = {
       id: id('int'),
@@ -219,9 +228,9 @@ export function appRouter(): Router {
     const cfg = req.body.config !== undefined ? cleanConfig(row.type, req.body.config, integrationConfig(row)) : integrationConfig(row);
     const enabled = req.body.enabled !== undefined ? (req.body.enabled ? 1 : 0) : row.enabled;
     if (enabled && !row.enabled) {
-      const plan = accountPlan(getAccount(req.user!.accountId));
+      const limits = accountLimits(getAccount(req.user!.accountId));
       const active = one<{ n: number }>('SELECT COUNT(*) AS n FROM integrations WHERE project_id = ? AND enabled = 1', row.project_id)!.n;
-      if (active >= PLANS[plan].destinationsPerProject) throw new HttpError(402, `Your plan allows ${PLANS[plan].destinationsPerProject} destination(s) per site`, 'upgrade');
+      if (active >= limits.destinationsPerProject) throw new HttpError(402, `Your plan allows ${limits.destinationsPerProject} destination(s) per app`, 'upgrade');
     }
     run(
       'UPDATE integrations SET name = ?, config_enc = ?, categories = ?, enabled = ? WHERE id = ?',
@@ -257,7 +266,9 @@ export function appRouter(): Router {
   router.use(centerRouter());
 
   router.get('/tickets/:id', (req, res) => {
-    res.json(serializeTicket(ownedTicket(req), true));
+    const ticket = ownedTicket(req);
+    if (!accountLimits(getAccount(req.user!.accountId)).features.supportCenter) throw new HttpError(402, 'The report repository is part of Business', 'upgrade');
+    res.json(serializeTicket(ticket, true));
   });
 
   router.post('/tickets/:id/resend', async (req, res) => {

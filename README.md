@@ -21,7 +21,7 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 
 | Pieza | Qué hace |
 |---|---|
-| **Widget** (`packages/widget`) | Script embebible (~30 KB gzip), aislado en Shadow DOM. **Logo nebulosa**: una galaxia amarilla pastel que gira lentamente sobre su centro, se expande al abrir el panel (que emerge desde ella), se contrae al cerrar y, al enviar un reporte, muestra un agradecimiento con un destello de estrellas antes de volver a su esquina. Avisa con un anillo suave cuando la página tira un error. Captura de pantalla sin permisos con editor (resaltar, dibujar, ocultar datos), grabación de pantalla con pasos automáticos, formulario según el template. Estilo tipo Apple (vidrio esmerilado, controles segmentados), modo oscuro, español e inglés, respeta "reducir movimiento". |
+| **Widget** (`packages/widget`) | Script embebible (~30 KB gzip). Amarillo pastel brillante por defecto, aislado en Shadow DOM. **Logo nebulosa**: una galaxia amarilla pastel que gira lentamente sobre su centro, se expande al abrir el panel (que emerge desde ella), se contrae al cerrar y, al enviar un reporte, muestra un agradecimiento con un destello de estrellas antes de volver a su esquina. Avisa con un anillo suave cuando la página tira un error. Captura de pantalla sin permisos con editor (resaltar, dibujar, ocultar datos), grabación de pantalla con pasos automáticos, formulario según el template. Estilo tipo Apple (vidrio esmerilado, controles segmentados), modo oscuro, español e inglés, respeta "reducir movimiento". |
 | **Servidor** (`packages/server`) | API multi-tenant (Node 22 + Express 5 + SQLite nativo). Límites por plan aplicados en el servidor, adjuntos con links firmados, credenciales cifradas (AES-256-GCM), Stripe, **sincronización de estado** (sondeo periódico + webhooks entrantes), **agrupación de reportes similares** en issues y métricas. |
 | **Back office** (`packages/dashboard`) | React, estilo Apple. **Overview** (métricas), **Reports** (repositorio con estados, filtros y vista agrupada por issue) y **Settings** con pestañas: Install, Widget, Ticket template, Data capture, Integrations, General. Plan y facturación aparte. |
 | **Demo** (`demo/`) | App falsa con botones para romper cosas, para probar el widget. |
@@ -45,21 +45,28 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 
 ### Planes (mensuales)
 
-| | **Starter** $19 | **Pro** $59 | **Business** $179 |
+| | **Free** · $0 | **Pro** · $49 ★ el core | **Business** · $149 |
 |---|---|---|---|
-| Apps / reportes por mes | 1 / 150 | 5 / 1.500 | 25 / 15.000 |
-| Captura + anotación, consola, red, entorno, pasos | ✓ | ✓ | ✓ |
-| Grabación → pasos escritos | 1 min | 5 min + voz | 10 min + voz |
-| Issue trackers (Jira, Azure DevOps, GitHub, GitLab, Linear…) | ✓ | ✓ | ✓ |
-| Help desks (Zendesk, Freshdesk, HubSpot) | — | ✓ | ✓ |
-| Salesforce, ServiceNow, Freshservice | — | — | ✓ |
-| Destinos por app | 1 | 3 | 10 + ruteo por categoría |
-| Template personalizado, sin marca | — | ✓ | ✓ |
-| Historial de reportes | 30 días | 90 días | 2 años |
-| **Support Center** (dashboard, estado sincronizado, issues agrupados) | — | — | ✓ |
-| Pasos y resumen con IA, reglas para ocultar elementos | — | — | ✓ |
+| Para quién | Probar el widget | El reporte de bug completo | Centro de soporte |
+| Apps / reportes por mes | 1 / 25 | 1 / 500 | 25 / 10.000 |
+| Captura + anotación, consola y entorno | ✓ | ✓ | ✓ |
+| Grabación con voz → pasos escritos | — | 2 min | 10 min |
+| Red y últimas acciones del usuario | — | ✓ | ✓ |
+| Destinos | Slack, webhook, e-mail | + 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
+| Template propio, sin marca | — | ✓ | ✓ |
+| Dashboard | — | Básica | Avanzada |
+| Repositorio con estado sincronizado, issues agrupados | — | — | ✓ |
+| AI Powered | — | Extra | ✓ |
 
-Las cuentas nuevas empiezan con 14 días de Pro. Todo está definido en `packages/shared/src/plans.ts`.
+**Extras para Pro** (mensuales): AI Powered $29 (transcripción de voz, resumen, pasos mejorados, esperado vs. real, prioridad sugerida, duplicados, traducción y causa probable; 500 reportes/mes) · Help desks $19 (Zendesk, Freshdesk, HubSpot y hasta 3 destinos) · Grabaciones largas $9 (10 min) · App extra $15 c/u · +1.000 reportes $15 c/u.
+
+Las cuentas nuevas tienen 14 días de Pro; si no pagan, bajan a Free y el widget sigue funcionando con los límites de Free. Planes y extras están en `packages/shared/src/plans.ts`; con Stripe, cada extra es un precio recurrente aparte (`STRIPE_PRICE_ADDON_*`).
+
+### AI Powered: cómo funciona
+
+1. Si la grabación tiene voz, se transcribe con un servicio de speech-to-text (`LUMORA_STT_PROVIDER` = `deepgram` u `openai`). Claude lee texto e imágenes pero no audio, por eso este paso va aparte.
+2. Claude recibe la transcripción, las acciones grabadas, errores de consola, requests fallidos, la captura de pantalla y los reportes abiertos, y devuelve título, resumen, pasos, esperado vs. real, categoría, prioridad, posible duplicado y causa probable, en el idioma del equipo.
+3. Todo eso entra al ticket (variables `{{ai.overview}}`, `{{transcript}}`, etc.) y se ve en el detalle del reporte.
 
 ## Correrlo localmente
 

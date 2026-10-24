@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
-import { buildSteps, clampSettingsToPlan, defaultSettings, mergeSettings, redactText, redactUrl, type UserAction } from '@lumora/shared';
+import { buildSteps, clampSettingsToPlan, effectiveLimits, monthlyPrice, defaultSettings, mergeSettings, redactText, redactUrl, type UserAction } from '@lumora/shared';
 import { toHtml, toJiraWiki, toSlack } from '../src/lib/markdown';
 import { renderTicket } from '../src/lib/ticket';
 import { verifyStripeSignature } from '../src/routes/billing';
@@ -56,13 +56,17 @@ test('plan clamping turns off features the plan lacks', () => {
   s.capture.aiSteps = true;
   s.appearance.showBranding = false;
   s.capture.redactSelectors = ['.secret'];
-  const starter = clampSettingsToPlan(s, 'starter');
-  assert.equal(starter.reportTypes.recording, true);
-  assert.equal(starter.recording.maxSeconds, 60, 'Starter recordings are capped at one minute');
-  assert.equal(starter.capture.network.enabled, true);
-  assert.equal(starter.capture.aiSteps, false);
-  assert.equal(starter.appearance.showBranding, true);
-  assert.deepEqual(starter.capture.redactSelectors, []);
+  const free = clampSettingsToPlan(s, 'free');
+  assert.equal(free.reportTypes.recording, false);
+  assert.equal(free.capture.network.enabled, false);
+  assert.equal(free.capture.aiSteps, false);
+  assert.equal(free.appearance.showBranding, true);
+  assert.deepEqual(free.capture.redactSelectors, []);
+  const pro = clampSettingsToPlan(s, 'pro');
+  assert.equal(pro.reportTypes.recording, true);
+  assert.equal(pro.recording.allowMicrophone, true, 'Pro recordings include voice');
+  assert.equal(pro.capture.aiSteps, false, 'AI is an extra on Pro');
+  assert.equal(clampSettingsToPlan(s, effectiveLimits('pro', { ai: 1 })).capture.aiSteps, true);
   const business = clampSettingsToPlan(s, 'business');
   assert.equal(business.capture.aiSteps, true);
   assert.equal(business.appearance.showBranding, false);
@@ -119,4 +123,18 @@ test('stripe webhook signatures are verified', () => {
   assert.equal(verifyStripeSignature(payload, `t=${t},v1=${sig}`, secret), true);
   assert.equal(verifyStripeSignature(payload, `t=${t},v1=${sig.replace(/.$/, '0')}`, secret), false);
   assert.equal(verifyStripeSignature(payload, `t=${t - 3600},v1=${sig}`, secret), false);
+});
+
+test('add-ons extend Pro and are ignored on other plans', () => {
+  const pro = effectiveLimits('pro', { extra_app: 2, extra_reports: 1, helpdesks: 1, long_recordings: 1, ai: 1 });
+  assert.equal(pro.projects, 3);
+  assert.equal(pro.reportsPerMonth, 1500);
+  assert.ok(pro.integrations.includes('zendesk'));
+  assert.equal(pro.destinationsPerProject, 3);
+  assert.equal(pro.features.recordingMaxSeconds, 600);
+  assert.equal(pro.features.aiSteps, true);
+  assert.equal(pro.aiReportsPerMonth, 500);
+  assert.ok(!pro.integrations.includes('salesforce'), 'enterprise tools stay on Business');
+  assert.equal(effectiveLimits('free', { ai: 1 }).features.aiSteps, false);
+  assert.equal(monthlyPrice('pro', { ai: 1, extra_app: 2 }), 49 + 29 + 30);
 });

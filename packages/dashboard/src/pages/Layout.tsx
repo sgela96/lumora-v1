@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
 import { Icons } from '../components/icons';
-import { Nebula, useToast } from '../components/ui';
+import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
 import { navigate, useApp, useRoute } from '../state';
 import { BillingPage } from './Billing';
 import { OverviewPage } from './Overview';
@@ -15,16 +15,17 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   const route = useRoute();
   const [menuOpen, setMenuOpen] = useState(false);
   const supportCenter = me.limits.features.supportCenter;
+  const dashboard = me.limits.features.basicDashboard;
 
-  const [root, projectId, section = supportCenter ? 'overview' : 'reports', sub] = route;
+  const [root, projectId, section = 'overview', sub] = route;
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
   useEffect(() => {
     if (root === 'billing' || !project) return;
     if (root !== 'p' || !projects.some((p) => p.id === projectId)) {
-      navigate(`/p/${project.id}/${project.tickets ? (supportCenter ? 'overview' : 'reports') : 'settings/install'}`);
+      navigate(`/p/${project.id}/${project.tickets ? 'overview' : 'settings/install'}`);
     }
-  }, [root, projectId, project, projects, supportCenter]);
+  }, [root, projectId, project, projects]);
 
   useEffect(() => setMenuOpen(false), [route.join('/')]);
 
@@ -55,19 +56,34 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   if (root === 'billing') page = <BillingPage />;
   else if (project) {
     if (section === 'overview') page = <OverviewPage key={project.id} project={project} />;
+    else if (section === 'reports' && !supportCenter)
+      page = (
+        <div className="stack rise">
+          <PageHead title="Reports" subtitle="Every report from your app in one place." />
+          <div style={{ display: 'grid', placeItems: 'center', padding: '24px 0' }}>
+            <Upsell title="Your support command center">
+              The report repository is part of Business: every report with the live status of its ticket in Jira, Zendesk or ServiceNow, filters and search,
+              similar reports grouped into issues, and the advanced dashboard.
+            </Upsell>
+          </div>
+        </div>
+      );
     else if (section === 'reports' && sub) page = <TicketPage key={sub} project={project} ticketId={sub} />;
     else if (section === 'reports') page = <ReportsPage key={project.id} project={project} />;
     else if (section === 'settings') page = <SettingsPage key={project.id} project={project} tab={sub ?? 'install'} />;
   }
 
   const nav = [
-    { id: 'overview', label: 'Overview', icon: Icons.overview, locked: !supportCenter },
-    { id: 'reports', label: 'Reports', icon: Icons.reports, count: project?.tickets },
+    { id: 'overview', label: 'Overview', icon: Icons.overview, locked: !dashboard },
+    { id: 'reports', label: 'Reports', icon: Icons.reports, count: project?.tickets, locked: !supportCenter },
     { id: 'settings', label: 'Settings', icon: Icons.settings },
   ];
 
   return (
     <div className="shell">
+      <div className="ambient" aria-hidden>
+        <span />
+      </div>
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
         <a className="brand" href="#/">
           <Nebula /> Lumora
@@ -94,7 +110,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
             <a key={n.id} className={`nav-link${root === 'p' && section === n.id ? ' active' : ''}`} href={`#/p/${project.id}/${n.id}`}>
               <n.icon /> {n.label}
               {n.locked ? (
-                <span className="lock muted" title="Business plan">
+                <span className="lock muted" title={n.id === 'overview' ? 'Pro plan' : 'Business plan'}>
                   <Icons.lock size={13} />
                 </span>
               ) : n.count ? (

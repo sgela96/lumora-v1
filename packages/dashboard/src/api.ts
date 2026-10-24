@@ -1,4 +1,4 @@
-import type { IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
+import type { Addon, AddonId, AddonQuantities, IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -24,14 +24,16 @@ export interface Me {
     id: string;
     name: string;
     plan: PlanId;
+    chosenPlan: PlanId;
+    addons: AddonQuantities;
     planStatus: string;
     trialEndsAt: string | null;
     active: boolean;
     hasBillingCustomer: boolean;
   };
   limits: PlanLimits;
-  usage: { month: string; reports: number };
-  server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; emailAvailable: boolean };
+  usage: { month: string; reports: number; aiReports: number };
+  server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; transcriptionAvailable: boolean; emailAvailable: boolean };
 }
 
 export interface ConnectorInfo {
@@ -45,6 +47,8 @@ export interface ConnectorInfo {
 
 export interface Catalog {
   plans: Record<PlanId, PlanLimits>;
+  addons: Record<AddonId, Addon>;
+  addonOrder: AddonId[];
   integrations: ConnectorInfo[];
   templateVariables: { name: string; description: string }[];
   defaults: ProjectSettings;
@@ -113,6 +117,17 @@ export interface TicketSummary {
 export interface TicketDetail extends TicketSummary {
   description: string;
   aiSummary: string | null;
+  ai: {
+    title: string;
+    summary: string;
+    expected: string;
+    actual: string;
+    category?: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    technicalHint: string;
+    duplicateOf?: string;
+  } | null;
+  transcript: { text: string; language?: string; segments: { start: number; end: number; text: string }[] } | null;
   steps: { text: string; timestamp: number }[];
   payload: ReportPayload;
   screenshotUrl: string | null;
@@ -139,8 +154,29 @@ export interface IssueGroup {
   pages: string[];
 }
 
-export interface Metrics {
+export interface RecentReport {
+  id: string;
+  reference: string;
+  title: string;
+  category: string | null;
+  kind: string;
+  createdAt: string;
+  linked: { type: string; ref: string | null; url: string | null } | null;
+}
+
+export interface BasicMetrics {
+  level: 'basic';
   days: number;
+  totals: { reports: number; previous: number; withRecording: number; withErrors: number };
+  series: { day: string; created: number }[];
+  byCategory: { label: string; value: number }[];
+  recent: RecentReport[];
+}
+
+export interface Metrics {
+  level: 'advanced';
+  days: number;
+  recent: RecentReport[];
   totals: {
     reports: number;
     previous: number;

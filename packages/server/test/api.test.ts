@@ -50,6 +50,11 @@ test('register → project → widget config → report → ticket', async () =>
   const me = await call('/api/me');
   assert.equal(me.body.account.plan, 'pro');
   assert.equal(me.body.account.planStatus, 'trialing');
+  // Pro: basic dashboard, no repository.
+  const [firstProject] = (await call('/api/projects')).body;
+  assert.equal((await call(`/api/projects/${firstProject.id}/metrics`)).body.level, 'basic');
+  assert.equal((await call(`/api/projects/${firstProject.id}/tickets`)).status, 402);
+  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'business' } })).status, 200);
 
   const [project] = (await call('/api/projects')).body;
   assert.match(project.publicKey, /^pk_/);
@@ -92,10 +97,14 @@ test('allowed origins and plan limits are enforced', async () => {
   assert.equal(allowed.status, 200);
   assert.equal(allowed.headers.get('access-control-allow-origin'), 'https://app.acme.com');
 
-  // Downgrade to Starter: recordings are capped, help desks and the Support Center are locked.
-  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'starter' } })).status, 200);
+  // Downgrade to Free: no recording, no trackers, no dashboard.
+  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'free' } })).status, 200);
   const cfg = await fetch(`${base}/api/widget/config?key=${project.publicKey}`, { headers: { Origin: 'https://acme.com' } }).then((r) => r.json());
-  assert.equal(cfg.settings.recording.maxSeconds, 60);
+  assert.equal(cfg.settings.reportTypes.recording, false);
+  const jiraOnFree = await call(`/api/projects/${project.id}/integrations`, {
+    body: { type: 'jira', config: { siteUrl: 'https://x.atlassian.net', email: 'a@b.c', apiToken: 't', projectKey: 'SUP' } },
+  });
+  assert.equal(jiraOnFree.status, 402);
   const zendesk = await call(`/api/projects/${project.id}/integrations`, {
     body: { type: 'zendesk', config: { subdomain: 'acme', email: 'a@b.c', apiToken: 't' } },
   });
@@ -123,6 +132,7 @@ test('cookie-authenticated mutations require JSON (CSRF guard)', async () => {
 });
 
 test('other accounts cannot read tickets', async () => {
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
   const [project] = (await call('/api/projects')).body;
   const { body } = await call(`/api/projects/${project.id}/tickets`);
   const ticketId = body.items[0].id;
@@ -218,4 +228,25 @@ test('Support Center: grouping, metrics, manual status and status sync from Jira
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test('Pro extras unlock help desks; an expired trial falls back to Free', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Pat', company: 'Initech', email: 'pat@initech.test', password: 'password123' } });
+  const [project] = (await call('/api/projects')).body;
+  const zendesk = { type: 'zendesk', config: { subdomain: 'initech', email: 'a@b.c', apiToken: 't' } };
+  assert.equal((await call(`/api/projects/${project.id}/integrations`, { body: zendesk })).status, 402);
+  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'pro', addons: { helpdesks: 1, ai: 1, nonsense: 3 } } })).status, 200);
+  const me = (await call('/api/me')).body;
+  assert.deepEqual(me.account.addons, { helpdesks: 1, ai: 1 });
+  assert.equal(me.limits.features.aiSteps, true);
+  assert.equal((await call(`/api/projects/${project.id}/integrations`, { body: zendesk })).status, 201);
+
+  // Trial over without paying → Free limits, widget still works.
+  const { getDb } = await import('../src/db');
+  getDb().prepare("UPDATE accounts SET plan_status = 'trialing', trial_ends_at = '2000-01-01T00:00:00Z' WHERE id = ?").run(me.account.id);
+  const after = (await call('/api/me')).body;
+  assert.equal(after.account.plan, 'free');
+  const cfg = await fetch(`${base}/api/widget/config?key=${project.publicKey}`).then((r) => r.json());
+  assert.equal(cfg.plan, 'free');
 });

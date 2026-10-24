@@ -2,9 +2,11 @@ import { mkdir, rename, stat } from 'node:fs/promises';
 import path from 'node:path';
 import {
   clampSettingsToPlan,
+  effectiveLimits,
   isPlanId,
   mergeSettings,
-  PLANS,
+  type AddonQuantities,
+  type PlanLimits,
   type IntegrationType,
   type PlanId,
   type ProjectSettings,
@@ -15,9 +17,10 @@ import { billingEnabled, config } from './config';
 import { getConnector } from './connectors';
 import type { LocalFile } from './connectors/types';
 import { all, one, run, transaction } from './db';
-import { improveReport } from './lib/ai';
+import { improveReport, type AiResult } from './lib/ai';
 import { decrypt, encrypt, id, signFileUrl } from './lib/crypto';
 import { issueSignature, normalizePath, pathOf } from './lib/signature';
+import { transcribe, type Transcript } from './lib/transcribe';
 import { renderTicket, stepsFor, ticketLocale, type Attachment } from './lib/ticket';
 
 // ---------------------------------------------------------------- Accounts & plans
@@ -30,6 +33,8 @@ export interface AccountRow {
   trial_ends_at: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  /** JSON AddonQuantities, e.g. {"ai":1,"extra_app":2} */
+  addons: string;
   created_at: string;
 }
 
@@ -39,20 +44,50 @@ export function getAccount(accountId: string): AccountRow {
   return account;
 }
 
+/**
+ * The plan the account gets right now. Paid plans need an active subscription or a running
+ * trial; otherwise the account falls back to Free (the widget keeps working with Free limits).
+ */
 export function accountPlan(account: AccountRow): PlanId {
-  return isPlanId(account.plan) ? account.plan : 'starter';
+  const stored = isPlanId(account.plan) ? account.plan : 'free';
+  if (stored === 'free') return 'free';
+  if (account.plan_status === 'active') return stored;
+  if (account.plan_status === 'trialing' && (!account.trial_ends_at || new Date(account.trial_ends_at) > new Date())) return stored;
+  return 'free';
 }
 
-/** Whether the subscription currently allows the widget to work. */
+export function accountAddons(account: AccountRow): AddonQuantities {
+  try {
+    return JSON.parse(account.addons || '{}') as AddonQuantities;
+  } catch {
+    return {};
+  }
+}
+
+/** Plan limits plus the add-ons the account pays for. */
+export function accountLimits(account: AccountRow): PlanLimits {
+  return effectiveLimits(accountPlan(account), accountAddons(account));
+}
+
+/** Whether the paid plan the account chose is currently in force (false = fell back to Free). */
 export function subscriptionActive(account: AccountRow): boolean {
-  if (!billingEnabled()) return true;
-  if (account.plan_status === 'active') return true;
-  if (account.plan_status === 'trialing') return !account.trial_ends_at || new Date(account.trial_ends_at) > new Date();
-  return false;
+  return accountPlan(account) === (isPlanId(account.plan) ? account.plan : 'free');
 }
 
 export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
+}
+
+/** Counts one AI-processed report against the monthly AI quota; false when it's used up. */
+function consumeAiQuota(account: AccountRow, limits: PlanLimits): boolean {
+  const used = one<{ ai_reports: number }>('SELECT ai_reports FROM usage WHERE account_id = ? AND month = ?', account.id, currentMonth())?.ai_reports ?? 0;
+  if (used >= limits.aiReportsPerMonth) return false;
+  run('UPDATE usage SET ai_reports = ai_reports + 1 WHERE account_id = ? AND month = ?', account.id, currentMonth());
+  return true;
+}
+
+export function monthlyAiUsage(accountId: string): number {
+  return one<{ ai_reports: number }>('SELECT ai_reports FROM usage WHERE account_id = ? AND month = ?', accountId, currentMonth())?.ai_reports ?? 0;
 }
 
 export function monthlyUsage(accountId: string): number {
@@ -77,8 +112,8 @@ export function projectSettings(project: ProjectRow): ProjectSettings {
   return mergeSettings(JSON.parse(project.settings || '{}'));
 }
 
-export function effectiveSettings(project: ProjectRow, plan: PlanId): ProjectSettings {
-  return clampSettingsToPlan(projectSettings(project), plan);
+export function effectiveSettings(project: ProjectRow, limits: PlanLimits): ProjectSettings {
+  return clampSettingsToPlan(projectSettings(project), limits);
 }
 
 export function allowedOrigins(project: ProjectRow): string[] {
@@ -167,8 +202,8 @@ export function sealConfig(cfg: Record<string, string>): string {
   return encrypt(JSON.stringify(cfg));
 }
 
-export function canUseIntegration(plan: PlanId, type: string): boolean {
-  return PLANS[plan].integrations.includes(type as IntegrationType);
+export function canUseIntegration(limits: PlanLimits, type: string): boolean {
+  return limits.integrations.includes(type as IntegrationType);
 }
 
 // ---------------------------------------------------------------- Reports → tickets
@@ -208,8 +243,8 @@ export async function createTicket(
   payload: ReportPayload,
   files: { screenshot?: UploadedFile; recording?: UploadedFile },
 ): Promise<{ id: string; reference: string }> {
-  const plan = accountPlan(account);
-  const settings = effectiveSettings(project, plan);
+  const limits = accountLimits(account);
+  const settings = effectiveSettings(project, limits);
   sanitizePayload(payload, settings);
 
   const ticketId = id('tkt');
@@ -274,12 +309,30 @@ export async function createTicket(
 
   // The user gets their reference right away; AI and forwarding happen in the background.
   void (async () => {
-    if (settings.capture.aiSteps) {
-      const ai = await improveReport(payload, steps, relative, ticketLocale(settings));
-      if (ai) {
-        const aiSteps = ai.steps.length ? ai.steps : steps;
-        const improved = renderTicket({ settings, payload, steps: aiSteps, stepsAreRelative: ai.steps.length ? false : relative, attachments, aiSummary: ai.summary, reference });
-        run('UPDATE tickets SET title = ?, description = ?, steps = ?, ai_summary = ? WHERE id = ?', improved.title, improved.description, JSON.stringify(aiSteps), ai.summary, ticketId);
+    if (settings.capture.aiSteps && consumeAiQuota(account, limits)) {
+      // 1. What the user said while recording (speech-to-text), 2. Claude turns everything into a triaged ticket.
+      const transcript = stored.recording && payload.recordingHasAudio ? await transcribe(stored.recording) : undefined;
+      const categories = settings.template.fields.find((f) => f.id === 'category' && f.type === 'select')?.options ?? [];
+      const openReports = all<{ reference: string; title: string }>(
+        "SELECT reference, title FROM tickets WHERE project_id = ? AND id != ? AND status != 'resolved' ORDER BY created_at DESC LIMIT 25",
+        project.id,
+        ticketId,
+      );
+      const ai = await improveReport({ payload, rawSteps: steps, relative, locale: ticketLocale(settings), transcript, screenshot: stored.screenshot, categories, openReports });
+      if (ai || transcript) {
+        const finalSteps = ai?.steps.length ? ai.steps : steps;
+        const improved = renderTicket({ settings, payload, steps: finalSteps, stepsAreRelative: ai?.steps.length ? false : relative, attachments, ai, transcript, reference });
+        run(
+          'UPDATE tickets SET title = ?, description = ?, steps = ?, ai_summary = ?, ai_data = ?, transcript = ?, category = COALESCE(category, ?) WHERE id = ?',
+          improved.title,
+          improved.description,
+          JSON.stringify(finalSteps),
+          ai?.summary ?? null,
+          ai ? JSON.stringify(ai) : null,
+          transcript ? JSON.stringify(transcript) : null,
+          ai?.category ?? null,
+          ticketId,
+        );
       }
     }
     await deliverTicket(ticketId);
@@ -318,6 +371,8 @@ export interface TicketRow {
   payload: string;
   steps: string;
   ai_summary: string | null;
+  ai_data: string | null;
+  transcript: string | null;
   screenshot_file: string | null;
   recording_file: string | null;
   deliveries: string;
@@ -343,14 +398,14 @@ export async function deliverTicket(ticketId: string, onlyIntegrationId?: string
   if (!ticket) throw new HttpError(404, 'Ticket not found');
   const project = one<ProjectRow>('SELECT * FROM projects WHERE id = ?', ticket.project_id)!;
   const account = getAccount(project.account_id);
-  const plan = accountPlan(account);
+  const limits = accountLimits(account);
   const payload = JSON.parse(ticket.payload) as ReportPayload;
 
   let integrations = all<IntegrationRow>('SELECT * FROM integrations WHERE project_id = ? AND enabled = 1 ORDER BY created_at', project.id)
-    .filter((i) => canUseIntegration(plan, i.type))
-    .slice(0, PLANS[plan].destinationsPerProject);
+    .filter((i) => canUseIntegration(limits, i.type))
+    .slice(0, limits.destinationsPerProject);
   if (onlyIntegrationId) integrations = integrations.filter((i) => i.id === onlyIntegrationId);
-  if (PLANS[plan].features.routingByCategory) {
+  if (limits.features.routingByCategory) {
     integrations = integrations.filter((i) => {
       const cats = JSON.parse(i.categories) as string[];
       return !cats.length || (ticket.category !== null && cats.includes(ticket.category));
@@ -436,6 +491,8 @@ export function serializeTicket(row: TicketRow, full = false) {
     ...base,
     description: row.description,
     aiSummary: row.ai_summary,
+    ai: row.ai_data ? (JSON.parse(row.ai_data) as AiResult) : null,
+    transcript: row.transcript ? (JSON.parse(row.transcript) as Transcript) : null,
     steps: JSON.parse(row.steps),
     payload: JSON.parse(row.payload) as ReportPayload,
     screenshotUrl: row.screenshot_file ? `/api/tickets/${row.id}/files/${row.screenshot_file}` : null,

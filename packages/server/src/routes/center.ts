@@ -3,7 +3,7 @@ import express, { Router, type Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { all, one, run } from '../db';
 import {
-  accountPlan,
+  accountLimits,
   getAccount,
   getOwnedProject,
   HttpError,
@@ -18,7 +18,7 @@ const STATUSES: TicketStatus[] = ['open', 'in_progress', 'resolved'];
 const str = (v: unknown, max = 200): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 function planOf(req: Request) {
-  return PLANS[accountPlan(getAccount(req.user!.accountId))];
+  return accountLimits(getAccount(req.user!.accountId));
 }
 
 function requireSupportCenter(req: Request): void {
@@ -82,6 +82,7 @@ export function centerRouter(): Router {
   // ---------------------------------------------------------- Report repository
 
   router.get('/projects/:id/tickets', (req, res) => {
+    requireSupportCenter(req);
     const project = getOwnedProject(req.user!.accountId, req.params.id);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -153,9 +154,12 @@ export function centerRouter(): Router {
   // ---------------------------------------------------------- Dashboard metrics
 
   router.get('/projects/:id/metrics', (req, res) => {
-    requireSupportCenter(req);
+    const limits = planOf(req);
+    if (!limits.features.basicDashboard) throw new HttpError(402, 'The dashboard is part of Pro', 'upgrade');
+    const advanced = limits.features.supportCenter;
     const project = getOwnedProject(req.user!.accountId, req.params.id);
-    const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 365);
+    // The basic dashboard covers the last 30 days; the advanced one goes back up to a year.
+    const days = advanced ? Math.min(Math.max(Number(req.query.days) || 30, 7), 365) : 30;
     const since = sqlDate(new Date(Date.now() - days * 86400_000));
     const prevSince = sqlDate(new Date(Date.now() - 2 * days * 86400_000));
     const p = project.id;
@@ -198,7 +202,35 @@ export function centerRouter(): Router {
         limit,
       );
 
+    // Latest reports, each linked to the ticket it created (the basic dashboard's "activity").
+    const recent = all<TicketRow>('SELECT * FROM tickets WHERE project_id = ? ORDER BY created_at DESC LIMIT 8', p).map((t) => {
+      const linked = (JSON.parse(t.deliveries) as { status: string; type: string; displayId?: string; externalId?: string; url?: string }[]).find((d) => d.status === 'sent');
+      return {
+        id: t.id,
+        reference: t.reference,
+        title: t.title,
+        category: t.category,
+        kind: t.kind,
+        createdAt: t.created_at,
+        linked: linked ? { type: linked.type, ref: linked.displayId ?? linked.externalId ?? null, url: linked.url ?? null } : null,
+      };
+    });
+
+    if (!advanced) {
+      res.json({
+        level: 'basic',
+        days,
+        totals: { reports, previous, withRecording: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND recording_file IS NOT NULL', p, since), withErrors: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND error_count > 0', p, since) },
+        series: [...byDay.values()].map((d) => ({ day: d.day, created: d.created })),
+        byCategory: breakdown('category'),
+        recent,
+      });
+      return;
+    }
+
     res.json({
+      level: 'advanced',
+      recent,
       days,
       totals: {
         reports,

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface Series {
   key: string;
@@ -79,9 +79,15 @@ export function TrendChart<T extends { day: string } & Record<string, number | s
             ) : null,
           )}
         </g>
-        {paths[0] && <path d={paths[0].area} fill={`var(${paths[0].s.color})`} opacity={0.1} />}
+        <defs>
+          <linearGradient id="lu-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`var(${series[0].color})`} stopOpacity={0.28} />
+            <stop offset="100%" stopColor={`var(${series[0].color})`} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        {paths[0] && <path className="area" d={paths[0].area} fill="url(#lu-area)" />}
         {paths.map(({ s, line }) => (
-          <path key={s.key} d={line} fill="none" stroke={`var(${s.color})`} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <path key={s.key} className="line" d={line} fill="none" stroke={`var(${s.color})`} style={{ color: `var(${s.color})` }} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         ))}
         {/* Direct labels at the end of each line (nudged apart when they collide). */}
         {endLabels(paths.map((p) => ({ label: p.s.label, color: p.s.color, y: p.last[1], value: Number(data[data.length - 1]?.[p.s.key]) || 0 }))).map((l) => (
@@ -174,4 +180,43 @@ function shortDate(day: string): string {
 
 function longDate(day: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' });
+}
+
+/** Tiny trend line for KPI tiles (decorative; the number beside it carries the value). */
+export function Sparkline({ values, color = '--series-reports' }: { values: number[]; color?: string }) {
+  if (values.length < 2) return null;
+  const w = 96;
+  const h = 34;
+  const max = Math.max(1, ...values);
+  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - 3 - (v / max) * (h - 6)).toFixed(1)}`);
+  return (
+    <svg className="spark" viewBox={`0 0 ${w} ${h}`} aria-hidden>
+      <defs>
+        <linearGradient id={`sp${color}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={`var(${color})`} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={`var(${color})`} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${h} ${pts.join(' ')} ${w},${h}`} fill={`url(#sp${color})`} />
+      <polyline points={pts.join(' ')} fill="none" stroke={`var(${color})`} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Animates a number from 0 to its value on first render (respects reduced motion). */
+export function useCountUp(target: number, ms = 900): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return setValue(target);
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      setValue(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, ms]);
+  return value;
 }

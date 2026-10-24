@@ -1,6 +1,6 @@
 // Types shared by the widget, the server and the dashboard.
 
-export type PlanId = 'starter' | 'pro' | 'business';
+export type PlanId = 'free' | 'pro' | 'business';
 
 export type Locale = 'en' | 'es';
 
@@ -148,4 +148,6 @@ export interface ReportPayload {
   /** Actions captured during the screen recording, timestamps relative to recording start (ms). */
   recordingActions?: UserAction[];
   recordingDurationMs?: number;
+  /** The recording includes the user's voice (microphone was on). */
+  recordingHasAudio?: boolean;
 }

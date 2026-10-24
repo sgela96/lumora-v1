@@ -2,7 +2,8 @@
 // slowly turn around the center. Pure SVG markup (no user data), so it can be injected as-is.
 // Motion lives in CSS (classes below) so it runs on the compositor and costs the host page nothing.
 
-export const NEBULA_DEFAULT_ACCENT = '#F4C152';
+/** Bright pastel yellow — the Lumora light. */
+export const NEBULA_DEFAULT_ACCENT = '#FFD666';
 
 let counter = 0;
 

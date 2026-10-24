@@ -74,15 +74,16 @@ export function CapturePage({ project }: { project: Project }) {
             <ToggleRow title="Recent actions" description="The last clicks, inputs and page changes before the user opened Lumora." checked={c.breadcrumbs} onChange={(v) => update((s) => void (s.capture.breadcrumbs = v))} lockedTo={lock('breadcrumbs')} />
             <ToggleRow title="Steps from screen recordings" description="Turns what the user did while recording into written, timestamped steps." checked={c.recordingSteps} onChange={(v) => update((s) => void (s.capture.recordingSteps = v))} lockedTo={lock('recordingSteps')} />
             <ToggleRow
-              title="✦ AI-written steps & summary"
+              title="AI Powered"
               description={
                 me.server.aiAvailable || lock('aiSteps')
-                  ? 'Claude rewrites the captured actions and errors into clean steps and a one-line summary for your agents.'
+                  ? `Transcribes what people say while recording${me.server.transcriptionAvailable || lock('aiSteps') ? '' : ' (needs a speech-to-text key on the server)'}, then writes a summary, smarter steps, expected vs. actual, a suggested priority, possible duplicates and a likely cause — in your team’s language. ${me.limits.aiReportsPerMonth ? `${me.usage.aiReports} of ${me.limits.aiReportsPerMonth} used this month.` : ''}`
                   : 'Needs ANTHROPIC_API_KEY on the server.'
               }
               checked={c.aiSteps}
               onChange={(v) => update((s) => void (s.capture.aiSteps = v))}
               lockedTo={lock('aiSteps')}
+              lockLabel={me.account.plan === 'pro' ? 'AI Powered extra' : undefined}
             />
           </Card>
 

@@ -1,12 +1,12 @@
 import { unlink } from 'node:fs/promises';
 import os from 'node:os';
 import type { ReportPayload, WidgetConfig } from '@lumora/shared';
-import { PLANS } from '@lumora/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { config } from '../config';
 import { one } from '../db';
 import {
+  accountLimits,
   accountPlan,
   createTicket,
   effectiveSettings,
@@ -14,7 +14,6 @@ import {
   HttpError,
   monthlyUsage,
   originAllowed,
-  subscriptionActive,
   type ProjectRow,
   type UploadedFile,
 } from '../services';
@@ -73,9 +72,7 @@ export function widgetRouter(): Router {
     const project = findProject(req.query.key);
     if (!originAllowed(project, req.headers.origin)) throw new HttpError(403, 'This site is not allowed to use this widget key');
     const account = getAccount(project.account_id);
-    if (!subscriptionActive(account)) throw new HttpError(402, 'Subscription inactive');
-    const plan = accountPlan(account);
-    const body: WidgetConfig = { projectName: project.name, plan, settings: effectiveSettings(project, plan) };
+    const body: WidgetConfig = { projectName: project.name, plan: accountPlan(account), settings: effectiveSettings(project, accountLimits(account)) };
     // Revalidated on every load (cheap thanks to the ETag) so dashboard changes show up immediately.
     res.setHeader('Cache-Control', 'no-cache');
     res.json(body);
@@ -95,9 +92,7 @@ export function widgetRouter(): Router {
         const project = findProject(req.body?.key);
         if (!originAllowed(project, req.headers.origin)) throw new HttpError(403, 'This site is not allowed to use this widget key');
         const account = getAccount(project.account_id);
-        if (!subscriptionActive(account)) throw new HttpError(402, 'Subscription inactive');
-        const plan = accountPlan(account);
-        if (monthlyUsage(account.id) >= PLANS[plan].reportsPerMonth) throw new HttpError(429, 'This site reached its monthly report limit');
+        if (monthlyUsage(account.id) >= accountLimits(account).reportsPerMonth) throw new HttpError(429, 'This site reached its monthly report limit');
 
         const payload = parsePayload(req.body?.payload);
         const ticket = await createTicket(project, account, payload, files);

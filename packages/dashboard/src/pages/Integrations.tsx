@@ -116,7 +116,12 @@ export function IntegrationsPage({ project }: { project: Project }) {
                   <button key={c.type} className="card integration-tile" style={{ background: 'var(--surface-2)', boxShadow: 'none' }} onClick={() => (allowed ? setEditing({ connector: c }) : navigate('/billing'))}>
                     <div className="spread">
                       <LogoTile type={c.type} />
-                      {!allowed ? <UpgradeBadge plan={minimumPlanForIntegration(c.type)} /> : c.syncsStatus ? <span className="badge"><Icons.sync size={11} /> Syncs status</span> : null}
+                      {!allowed ? (
+                        <UpgradeBadge
+                          plan={minimumPlanForIntegration(c.type)}
+                          label={me.account.plan === 'pro' && INTEGRATION_CATEGORIES.helpdesks.types.includes(c.type) ? 'Help desks extra' : undefined}
+                        />
+                      ) : c.syncsStatus ? <span className="badge"><Icons.sync size={11} /> Syncs status</span> : null}
                     </div>
                     <strong>{c.label}</strong>
                     <span className="muted small">{c.description}</span>

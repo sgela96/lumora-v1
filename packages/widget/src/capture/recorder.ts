@@ -2,6 +2,8 @@ export interface Recording {
   blob: Blob;
   mimeType: string;
   durationMs: number;
+  /** The user's voice was recorded too. */
+  hasAudio: boolean;
 }
 
 export interface RecorderOptions {
@@ -32,6 +34,7 @@ export class ScreenRecorder {
   private ticker?: number;
   private limit?: number;
   private result?: Promise<Recording>;
+  private hasAudio = false;
 
   get startTime(): number {
     return this.startedAt;
@@ -52,6 +55,7 @@ export class ScreenRecorder {
         const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
         this.streams.push(mic);
         tracks.push(...mic.getAudioTracks());
+        this.hasAudio = mic.getAudioTracks().length > 0;
       } catch {
         // Recording without voice is still useful.
       }
@@ -70,7 +74,7 @@ export class ScreenRecorder {
     this.result = new Promise<Recording>((resolve) => {
       recorder.onstop = () => {
         const type = recorder.mimeType || mimeType || 'video/webm';
-        resolve({ blob: new Blob(this.chunks, { type }), mimeType: type, durationMs: Date.now() - this.startedAt });
+        resolve({ blob: new Blob(this.chunks, { type }), mimeType: type, durationMs: Date.now() - this.startedAt, hasAudio: this.hasAudio });
       };
     });
 

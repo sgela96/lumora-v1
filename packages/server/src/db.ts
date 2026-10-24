@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import type { ReportPayload } from '@lumora/shared';
+import { NEBULA_DEFAULT_ACCENT, type ReportPayload } from '@lumora/shared';
 import { config } from './config';
 import { issueSignature, normalizePath, pathOf } from './lib/signature';
 
@@ -118,6 +118,28 @@ const MIGRATIONS: Migration[] = [
         payload.console?.filter((e) => e.level === 'error').length ?? 0,
         row.id,
       );
+    }
+  },
+  /* sql */ `
+  ALTER TABLE accounts ADD COLUMN addons TEXT NOT NULL DEFAULT '{}';
+  UPDATE accounts SET plan = 'free' WHERE plan = 'starter';
+  ALTER TABLE usage ADD COLUMN ai_reports INTEGER NOT NULL DEFAULT 0;
+  `,
+  /* sql */ `
+  ALTER TABLE tickets ADD COLUMN ai_data TEXT;
+  ALTER TABLE tickets ADD COLUMN transcript TEXT;
+  `,
+  (database) => {
+    // Projects still on an earlier default color move to the new pastel yellow.
+    const rows = database.prepare('SELECT id, settings FROM projects').all() as { id: string; settings: string }[];
+    const update = database.prepare('UPDATE projects SET settings = ? WHERE id = ?');
+    for (const row of rows) {
+      const settings = JSON.parse(row.settings || '{}');
+      const accent = String(settings?.appearance?.accentColor ?? '').toUpperCase();
+      if (accent === '#F59E0B' || accent === '#F4C152') {
+        settings.appearance.accentColor = NEBULA_DEFAULT_ACCENT;
+        update.run(JSON.stringify(settings), row.id);
+      }
     }
   },
 ];

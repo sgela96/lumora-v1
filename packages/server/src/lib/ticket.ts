@@ -1,4 +1,6 @@
 import { buildSteps, formatOffset, type Locale, type ProjectSettings, type ReportPayload, type Step } from '@lumora/shared';
+import type { AiResult } from './ai';
+import type { Transcript } from './transcribe';
 
 export interface Attachment {
   name: string;
@@ -12,7 +14,8 @@ export interface RenderInput {
   steps: Step[];
   stepsAreRelative: boolean;
   attachments: Attachment[];
-  aiSummary?: string;
+  ai?: AiResult;
+  transcript?: Transcript;
   reference: string;
 }
 
@@ -43,14 +46,16 @@ export function renderTicket(input: RenderInput): RenderedTicket {
   return { title, description, category };
 }
 
-function buildVariables({ payload, steps, stepsAreRelative, attachments, aiSummary, reference }: RenderInput): Record<string, string> {
+const PRIORITY_LABEL: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
+
+function buildVariables({ payload, steps, stepsAreRelative, attachments, ai, transcript, reference }: RenderInput): Record<string, string> {
   const vars: Record<string, string> = {};
   for (const [k, v] of Object.entries(payload.fields)) vars[`fields.${k}`] = typeof v === 'boolean' ? (v ? 'Yes' : 'No') : v;
   for (const [k, v] of Object.entries(payload.metadata ?? {})) vars[`metadata.${k}`] = String(v);
 
   const mainText = String(payload.fields.description ?? Object.values(payload.fields).find((v) => typeof v === 'string' && v.length > 10) ?? '');
   const firstLine = mainText.split('\n').find((l) => l.trim())?.trim() ?? '';
-  vars.summary = firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine || 'New report';
+  vars.summary = ai?.title || (firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine || 'New report');
   vars.reference = reference;
 
   const r = payload.reporter ?? {};
@@ -101,7 +106,27 @@ function buildVariables({ payload, steps, stepsAreRelative, attachments, aiSumma
   vars.attachments = attachments.length
     ? `## Attachments\n${attachments.map((a) => `- [${a.kind === 'screenshot' ? 'Screenshot' : `Screen recording${payload.recordingDurationMs ? ` (${formatOffset(payload.recordingDurationMs)})` : ''}`}](${a.url})`).join('\n')}`
     : '';
-  vars['ai.summary'] = aiSummary ?? '';
+  vars['ai.summary'] = ai?.summary ?? '';
+  vars['ai.title'] = ai?.title ?? '';
+  vars['ai.priority'] = ai ? PRIORITY_LABEL[ai.priority] : '';
+  vars['ai.hint'] = ai?.technicalHint ?? '';
+  vars['ai.expected'] = ai?.expected ?? '';
+  vars['ai.actual'] = ai?.actual ?? '';
+  vars['ai.duplicate'] = ai?.duplicateOf ?? '';
+  vars['ai.overview'] = ai
+    ? [
+        `> **Summary:** ${ai.summary}`,
+        ai.expected && `> **Expected:** ${ai.expected}`,
+        ai.actual && `> **Actual:** ${ai.actual}`,
+        `> **Suggested priority:** ${PRIORITY_LABEL[ai.priority]}${ai.duplicateOf ? ` · **Possible duplicate of** ${ai.duplicateOf}` : ''}`,
+        ai.technicalHint && `> **Likely cause:** ${ai.technicalHint}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : '';
+  vars.transcript = transcript?.segments.length
+    ? transcript.segments.map((s) => `- [${formatOffset(s.start * 1000)}] ${s.text}`).join('\n')
+    : (transcript?.text ?? '');
   return vars;
 }
 

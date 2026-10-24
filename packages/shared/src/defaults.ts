@@ -1,16 +1,21 @@
 import { NEBULA_DEFAULT_ACCENT } from './nebula';
-import { PLANS } from './plans';
+import { PLANS, type PlanLimits } from './plans';
 import type { PlanId, ProjectSettings } from './types';
 
 export const DEFAULT_TITLE_TEMPLATE = '[{{fields.category}}] {{summary}}';
 
-export const DEFAULT_DESCRIPTION_TEMPLATE = `{{fields.description}}
+export const DEFAULT_DESCRIPTION_TEMPLATE = `{{ai.overview}}
+
+{{fields.description}}
 
 ## Reporter
 {{reporter}}
 
 ## Steps to reproduce
 {{steps}}
+
+## What the user said
+{{transcript}}
 
 ## Console
 {{console}}
@@ -37,7 +42,11 @@ export const TEMPLATE_VARIABLES: { name: string; description: string }[] = [
   { name: '{{page.path}}', description: 'Path of that URL' },
   { name: '{{attachments}}', description: 'Links to screenshot / recording' },
   { name: '{{metadata.<key>}}', description: 'Values sent with Lumora("metadata", …)' },
-  { name: '{{ai.summary}}', description: 'AI summary of the problem (Business)' },
+  { name: '{{ai.summary}}', description: 'AI summary of the problem (AI Powered)' },
+  { name: '{{ai.overview}}', description: 'Summary, expected vs. actual, priority, possible duplicate and technical hint (AI Powered)' },
+  { name: '{{ai.priority}}', description: 'Suggested priority: low, medium, high or urgent (AI Powered)' },
+  { name: '{{ai.hint}}', description: 'Likely technical cause for developers (AI Powered)' },
+  { name: '{{transcript}}', description: 'Timestamped transcript of what the user said while recording (AI Powered)' },
 ];
 
 export function defaultSettings(): ProjectSettings {
@@ -87,7 +96,7 @@ export function defaultSettings(): ProjectSettings {
       redactSelectors: [],
       redactSensitiveData: true,
     },
-    recording: { maxSeconds: 120, allowMicrophone: false },
+    recording: { maxSeconds: 120, allowMicrophone: true },
   };
 }
 
@@ -118,8 +127,8 @@ export function mergeSettings(stored: unknown): ProjectSettings {
  * Turns off everything the plan doesn't include. Applied when serving the widget config
  * and again when accepting a report, so a stale or tampered config can't unlock features.
  */
-export function clampSettingsToPlan(settings: ProjectSettings, plan: PlanId): ProjectSettings {
-  const f = PLANS[plan].features;
+export function clampSettingsToPlan(settings: ProjectSettings, plan: PlanId | PlanLimits): ProjectSettings {
+  const f = (typeof plan === 'string' ? PLANS[plan] : plan).features;
   const s: ProjectSettings = structuredClone(settings);
 
   s.reportTypes.recording = s.reportTypes.recording && f.recording;

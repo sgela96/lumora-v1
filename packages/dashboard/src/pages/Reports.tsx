@@ -86,7 +86,6 @@ export function ReportsPage({ project }: { project: Project }) {
           ]}
         />
         <div className="row">
-          {!supportCenter && <UpgradeBadge plan="business" />}
           <Segmented
             label="View"
             value={view}
