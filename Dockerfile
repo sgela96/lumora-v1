@@ -11,6 +11,7 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
 COPY demo ./demo
+COPY site ./site
 VOLUME /data
 EXPOSE 3000
 CMD ["node", "--disable-warning=ExperimentalWarning", "packages/server/dist/index.js"]

@@ -25,6 +25,7 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 | **Servidor** (`packages/server`) | API multi-tenant (Node 22 + Express 5 + SQLite nativo). Límites por plan aplicados en el servidor, adjuntos con links firmados, credenciales cifradas (AES-256-GCM), Stripe, **sincronización de estado** (sondeo periódico + webhooks entrantes), **agrupación de reportes similares** en issues y métricas. |
 | **Back office** (`packages/dashboard`) | React, estilo Apple. **Overview** (métricas), **Reports** (repositorio con estados, filtros y vista agrupada por issue) y **Settings** con pestañas: Install, Widget, Ticket template, Data capture, Integrations, General. Plan y facturación aparte. |
 | **Demo** (`demo/`) | App falsa con botones para romper cosas, para probar el widget. |
+| **Web** (`site/`) | Sitio de marketing en `/`: hero con la nebulosa, producto, cómo funciona, AI Powered, integraciones, Support Center, precios y registro (lleva nombre, e-mail y empresa al alta en `/app/#/register`). Un solo HTML estático, sin build. |
 
 ### Support Center (Business)
 
@@ -126,6 +127,7 @@ packages/
               Support Center en src/routes/center.ts
   dashboard/  React (esbuild), servido en /app
 demo/         página de prueba, servida en /demo
+site/         web de marketing, servida en /
 ```
 
 ## Próximos pasos sugeridos
