@@ -52,7 +52,7 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 | Captura + anotación, consola y entorno | ✓ | ✓ | ✓ |
 | Grabación con voz → pasos escritos | — | 2 min | 10 min |
 | Red y últimas acciones del usuario | — | ✓ | ✓ |
-| Destinos | Slack, webhook, e-mail | + 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
+| Destinos | 1 destino: Jira, GitHub, Linear, Slack, webhook o e-mail | + los 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
 | Template propio, sin marca | — | ✓ | ✓ |
 | Dashboard | — | Básica | Avanzada |
 | Repositorio con estado sincronizado, issues agrupados | — | — | ✓ |
@@ -60,7 +60,7 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 
 **Extras para Pro** (mensuales): AI Powered $29 (transcripción de voz, resumen, pasos mejorados, esperado vs. real, prioridad sugerida, duplicados, traducción y causa probable; 500 reportes/mes) · Help desks $19 (Zendesk, Freshdesk, HubSpot y hasta 3 destinos) · Grabaciones largas $9 (10 min) · App extra $15 c/u · +1.000 reportes $15 c/u.
 
-Las cuentas nuevas tienen 14 días de Pro; si no pagan, bajan a Free y el widget sigue funcionando con los límites de Free. Planes y extras están en `packages/shared/src/plans.ts`; con Stripe, cada extra es un precio recurrente aparte (`STRIPE_PRICE_ADDON_*`).
+Las cuentas nuevas empiezan en Free (para siempre). Desde el back office pueden activar **una sola vez** una prueba de Pro de 7 días sin tarjeta (`POST /api/billing/trial`, duración en `LUMORA_TRIAL_DAYS`); al terminar vuelven a Free y el widget sigue funcionando con los límites de Free. Planes y extras están en `packages/shared/src/plans.ts`; con Stripe, cada extra es un precio recurrente aparte (`STRIPE_PRICE_ADDON_*`).
 
 ### AI Powered: cómo funciona
 

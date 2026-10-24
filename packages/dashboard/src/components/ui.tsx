@@ -189,7 +189,7 @@ export function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; sa
 }
 
 /** Shown over a Business-only screen for other plans, with the real UI blurred behind it. */
-export function Upsell({ title, children, cta = 'Upgrade to Business' }: { title: string; children: ReactNode; cta?: string }) {
+export function Upsell({ title, children, cta = 'Upgrade to Business', action }: { title: string; children: ReactNode; cta?: string; action?: ReactNode }) {
   return (
     <div className="upsell card iris-border">
       <Nebula className="mark" />
@@ -197,9 +197,11 @@ export function Upsell({ title, children, cta = 'Upgrade to Business' }: { title
       <p className="muted" style={{ margin: '8px 0 18px' }}>
         {children}
       </p>
-      <a className="btn btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
-        <Icons.lock size={15} /> {cta}
-      </a>
+      {action ?? (
+        <a className="btn btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
+          <Icons.lock size={15} /> {cta}
+        </a>
+      )}
     </div>
   );
 }

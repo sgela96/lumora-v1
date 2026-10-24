@@ -5,6 +5,7 @@ import { Icons } from '../components/icons';
 import { Tour, tourSteps } from '../components/Tour';
 import { WelcomeModal } from '../components/WelcomeModal';
 import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
+import { TrialButton } from '../components/TrialButton';
 import { navigate, useApp, useRoute } from '../state';
 import { BillingPage } from './Billing';
 import { OverviewPage } from './Overview';
@@ -37,9 +38,9 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
 
   const saveOnboarding = useCallback((patch: Record<string, boolean>) => api('/me/onboarding', { method: 'PATCH', body: patch }).then(refresh), [refresh]);
 
-  // After a payment (or new extras), celebrate once with what just got unlocked. Trials and downgrades are acknowledged silently.
+  // After a payment, new extras or a started trial, celebrate once with what just got unlocked. Downgrades are acknowledged silently.
   const planChanged = me.account.planKey !== onboarding.seenPlan;
-  const celebrate = planChanged && me.account.plan !== 'free' && me.account.planStatus === 'active' && root !== 'setup';
+  const celebrate = planChanged && me.account.plan !== 'free' && ['active', 'trialing'].includes(me.account.planStatus) && root !== 'setup';
   const acked = useRef(false);
   useEffect(() => {
     if (planChanged && !celebrate && !acked.current && root !== 'setup') {
@@ -183,6 +184,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
             <div className="meter">
               <span style={{ width: `${Math.min(100, (me.usage.reports / me.limits.reportsPerMonth) * 100)}%` }} />
             </div>
+            {me.account.canTrial && <TrialButton className="btn btn-sm btn-primary trial-nudge" />}
           </div>
           <div className="spread small" style={{ padding: '0 6px' }}>
             <span className="muted" title={me.user.email}>

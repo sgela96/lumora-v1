@@ -3,7 +3,7 @@ import type { Me } from '../api';
 import { Icons } from './icons';
 import { Nebula } from './ui';
 
-/** Shown once after a payment is confirmed or extras change: what just got unlocked. */
+/** Shown once after a payment is confirmed, extras change or a trial starts: what just got unlocked. */
 export function WelcomeModal({ me, onClose, onTour }: { me: Me; onClose: () => void; onTour: () => void }) {
   const plan = PLANS[me.account.plan];
   const extras = ADDON_ORDER.filter((id) => (me.account.addons?.[id] ?? 0) > 0).map((id) => ADDONS[id]);
@@ -20,7 +20,9 @@ export function WelcomeModal({ me, onClose, onTour }: { me: Me; onClose: () => v
           Welcome to <span className="iris-text">{plan.name}</span>
         </h1>
         <p className="muted" style={{ textAlign: 'center', marginTop: 6 }}>
-          Your payment is confirmed. Here’s what you have now:
+          {me.account.planStatus === 'trialing' && me.account.trialEndsAt
+            ? `Your trial runs until ${new Date(me.account.trialEndsAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}. Here’s what you can try:`
+            : 'Your payment is confirmed. Here’s what you have now:'}
         </p>
         <ul className="unlock-list">
           {plan.highlights.map((h) => (

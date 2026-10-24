@@ -31,6 +31,8 @@ export interface Me {
     planKey: string;
     onboarding: { setupDone?: boolean; tourDone?: boolean; seenPlan?: string };
     trialEndsAt: string | null;
+    /** Free account that hasn't used its one Pro trial yet. */
+    canTrial: boolean;
     active: boolean;
     hasBillingCustomer: boolean;
   };

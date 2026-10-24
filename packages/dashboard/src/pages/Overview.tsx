@@ -5,6 +5,7 @@ import { Icons, LogoTile } from '../components/icons';
 import { Card, formatHours, Nebula, Segmented, timeAgo, Upsell } from '../components/ui';
 import { navigate, useApp } from '../state';
 import { setupProgress } from './Setup';
+import { TrialButton } from '../components/TrialButton';
 
 const SERIES: Series[] = [
   { key: 'created', label: 'Reports', color: '--series-reports' },
@@ -42,7 +43,7 @@ export function OverviewPage({ project }: { project: Project }) {
         <Hero name={me.user.name} lede={<>Your reports go straight to {project.name}’s destinations.</>} />
         <GettingStarted project={project} />
         <div style={{ display: 'grid', placeItems: 'center', padding: '24px 0' }}>
-          <Upsell title="See how your app is doing" cta="Upgrade to Pro">
+          <Upsell title="See how your app is doing" cta="Upgrade to Pro" action={me.account.canTrial ? <TrialButton /> : undefined}>
             Pro adds a dashboard with your report volume, trends, categories and the latest reports — plus screen recordings that turn into written steps.
           </Upsell>
         </div>

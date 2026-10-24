@@ -594,3 +594,6 @@ button.nav-link { width: 100%; border: 0; background: none; font: inherit; text-
   .pulse-dot, .spark, .celebrate-orb, .modal-orb, .tour-spot, .tour-bubble, .drawer { animation: none !important; transition: none !important; }
   .spark { display: none; }
 }
+
+/* Free accounts: one-time Pro trial under the usage meter. */
+.trial-nudge { width: 100%; justify-content: center; margin-top: 10px; }

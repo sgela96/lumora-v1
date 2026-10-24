@@ -66,6 +66,11 @@ export function accountAddons(account: AccountRow): AddonQuantities {
   }
 }
 
+/** One Pro trial per account, only for accounts that are on Free and have never paid. */
+export function canStartTrial(account: AccountRow): boolean {
+  return !account.trial_ends_at && !account.stripe_customer_id && accountPlan(account) === 'free';
+}
+
 /** Plan limits plus the add-ons the account pays for. */
 export function accountLimits(account: AccountRow): PlanLimits {
   return effectiveLimits(accountPlan(account), accountAddons(account));

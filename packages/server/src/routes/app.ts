@@ -28,6 +28,7 @@ import {
   planKey,
   type HookCapable,
   accountPlan,
+  canStartTrial,
   canUseIntegration,
   deliverTicket,
   getAccount,
@@ -67,10 +68,9 @@ export function appRouter(): Router {
     const passwordHash = await hashPassword(password);
     const accountId = id('acc');
     const userId = id('usr');
-    const trialEnds = new Date(Date.now() + config.trialDays * 86400_000).toISOString();
     const project = transaction(() => {
-      // New accounts get a Pro trial: they see the full product before choosing a tier.
-      run('INSERT INTO accounts (id, name, plan, plan_status, trial_ends_at, onboarding) VALUES (?, ?, ?, ?, ?, ?)', accountId, company, 'pro', 'trialing', trialEnds, JSON.stringify({ seenPlan: 'pro|trial|' }));
+      // New accounts start on Free; a Pro trial is opt-in from the back office (POST /api/billing/trial).
+      run('INSERT INTO accounts (id, name, plan, plan_status, trial_ends_at, onboarding) VALUES (?, ?, ?, ?, ?, ?)', accountId, company, 'free', 'active', null, JSON.stringify({ seenPlan: 'free|paid|' }));
       run('INSERT INTO users (id, account_id, email, name, password_hash) VALUES (?, ?, ?, ?, ?)', userId, accountId, email, name, passwordHash);
       return createProject(accountId, company);
     });
@@ -134,6 +134,7 @@ export function appRouter(): Router {
         planKey: planKey(account),
         onboarding: accountOnboarding(account),
         trialEndsAt: account.trial_ends_at,
+        canTrial: canStartTrial(account),
         active: subscriptionActive(account),
         hasBillingCustomer: !!account.stripe_customer_id,
       },
