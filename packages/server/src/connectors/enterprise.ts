@@ -24,6 +24,10 @@ export const hubspot: Connector = {
     { key: 'pipeline', label: 'Pipeline ID', type: 'text', required: false, placeholder: '0' },
     { key: 'stage', label: 'Initial stage ID', type: 'text', required: false, placeholder: '1' },
   ],
+  webhookGuide: [
+    'HubSpot → Automation → Workflows → ticket-based workflow, trigger “Ticket status is any of…”.',
+    'Add the action “Send a webhook” (Operations Hub) with method POST and the URL below.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'token');
     const headers = { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' };
@@ -96,6 +100,10 @@ export const servicenow: Connector = {
     { key: 'password', label: 'Password', type: 'password', required: true },
     { key: 'assignmentGroup', label: 'Assignment group (sys_id or name)', type: 'text', required: false },
   ],
+  webhookGuide: [
+    'ServiceNow updates arrive through regular status checks every few minutes.',
+    'For instant updates, an admin can add a Business Rule on Incident (after update, State changes) that sends a REST message (POST) to the URL below with the sys_id.',
+  ],
   async send(ctx, cfg) {
     required(cfg, 'instance', 'username', 'password');
     const base = serviceNowBase(cfg.instance);
@@ -158,6 +166,10 @@ export const freshservice: Connector = {
     { key: 'domain', label: 'Domain', type: 'text', required: true, placeholder: 'yourcompany.freshservice.com' },
     { key: 'apiKey', label: 'API key', type: 'password', required: true, help: 'Profile settings → Your API Key' },
     { key: 'fallbackEmail', label: 'Requester e-mail for anonymous reports', type: 'email', required: true, placeholder: 'reports@yourcompany.com' },
+  ],
+  webhookGuide: [
+    'Admin → Workflow Automator → New automator (Ticket, on update) → condition “Status is changed”.',
+    'Action: Trigger webhook, POST, the URL below, content {"ticket": "{{ticket.id_numeric}}"}.',
   ],
   async send(ctx, cfg) {
     required(cfg, 'domain', 'apiKey', 'fallbackEmail');

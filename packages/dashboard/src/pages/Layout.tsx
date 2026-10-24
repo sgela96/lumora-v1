@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
+import { HelpPanel } from '../components/Help';
 import { Icons } from '../components/icons';
+import { Tour, tourSteps } from '../components/Tour';
+import { WelcomeModal } from '../components/WelcomeModal';
 import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
 import { navigate, useApp, useRoute } from '../state';
 import { BillingPage } from './Billing';
 import { OverviewPage } from './Overview';
 import { ReportsPage } from './Reports';
 import { SettingsPage } from './Settings';
+import { SetupPage } from './Setup';
 import { TicketPage } from './Ticket';
 
 export function Layout({ onSignOut }: { onSignOut: () => void }) {
@@ -14,6 +18,9 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   const toast = useToast();
   const route = useRoute();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [touring, setTouring] = useState(false);
+  const onboarding = me.account.onboarding ?? {};
   const supportCenter = me.limits.features.supportCenter;
   const dashboard = me.limits.features.basicDashboard;
 
@@ -21,11 +28,34 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
   useEffect(() => {
-    if (root === 'billing' || !project) return;
+    if (root === 'billing' || root === 'setup' || !project) return;
     if (root !== 'p' || !projects.some((p) => p.id === projectId)) {
-      navigate(`/p/${project.id}/${project.tickets ? 'overview' : 'settings/install'}`);
+      // New accounts land in the setup guide until they finish or skip it.
+      navigate(!onboarding.setupDone ? '/setup' : `/p/${project.id}/${project.tickets ? 'overview' : 'settings/install'}`);
     }
-  }, [root, projectId, project, projects]);
+  }, [root, projectId, project, projects, onboarding.setupDone]);
+
+  const saveOnboarding = useCallback((patch: Record<string, boolean>) => api('/me/onboarding', { method: 'PATCH', body: patch }).then(refresh), [refresh]);
+
+  // After a payment (or new extras), celebrate once with what just got unlocked. Trials and downgrades are acknowledged silently.
+  const planChanged = me.account.planKey !== onboarding.seenPlan;
+  const celebrate = planChanged && me.account.plan !== 'free' && me.account.planStatus === 'active' && root !== 'setup';
+  const acked = useRef(false);
+  useEffect(() => {
+    if (planChanged && !celebrate && !acked.current && root !== 'setup') {
+      acked.current = true;
+      void saveOnboarding({ seenPlan: true });
+    }
+  }, [planChanged, celebrate, root, saveOnboarding]);
+
+  const startTour = () => {
+    if (root !== 'p') navigate(`/p/${project?.id}/overview`);
+    setTouring(true);
+  };
+  const endTour = () => {
+    setTouring(false);
+    if (!onboarding.tourDone) void saveOnboarding({ tourDone: true });
+  };
 
   useEffect(() => setMenuOpen(false), [route.join('/')]);
 
@@ -51,6 +81,19 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
     me.account.planStatus === 'trialing' && me.account.trialEndsAt
       ? Math.max(0, Math.ceil((new Date(me.account.trialEndsAt).getTime() - Date.now()) / 86400_000))
       : null;
+
+  if (root === 'setup' && project) {
+    return (
+      <SetupPage
+        project={project}
+        onFinish={async (tour) => {
+          await saveOnboarding({ setupDone: true });
+          navigate(`/p/${project.id}/overview`);
+          if (tour) setTouring(true);
+        }}
+      />
+    );
+  }
 
   let page = null;
   if (root === 'billing') page = <BillingPage />;
@@ -107,7 +150,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
 
         {project &&
           nav.map((n) => (
-            <a key={n.id} className={`nav-link${root === 'p' && section === n.id ? ' active' : ''}`} href={`#/p/${project.id}/${n.id}`}>
+            <a key={n.id} data-tour={`nav-${n.id}`} className={`nav-link${root === 'p' && section === n.id ? ' active' : ''}`} href={`#/p/${project.id}/${n.id}`}>
               <n.icon /> {n.label}
               {n.locked ? (
                 <span className="lock muted" title={n.id === 'overview' ? 'Pro plan' : 'Business plan'}>
@@ -120,9 +163,12 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
           ))}
 
         <div className="nav-label">Account</div>
-        <a className={`nav-link${root === 'billing' ? ' active' : ''}`} href="#/billing">
+        <a data-tour="nav-billing" className={`nav-link${root === 'billing' ? ' active' : ''}`} href="#/billing">
           <Icons.billing /> Plan & billing
         </a>
+        <button data-tour="help" className="nav-link" onClick={() => setHelpOpen(true)}>
+          <Icons.help /> Help
+        </button>
 
         <div className="sidebar-footer">
           <div className="card card-pad small" style={{ padding: '12px 14px' }}>
@@ -156,8 +202,42 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
           </button>
           <strong>{project?.name ?? 'Lumora'}</strong>
         </div>
-        <main className="main">{page}</main>
+        <main className="main">
+          {trialDays !== null && trialDays <= 3 && root !== 'billing' && (
+            <div className="trial-banner rise">
+              <Icons.sparkle size={16} />
+              <span>
+                Your Pro trial ends {trialDays === 0 ? 'today' : `in ${trialDays} day${trialDays === 1 ? '' : 's'}`}. Keep recordings, the dashboard and your template — or move to Free.
+              </span>
+              <a className="btn btn-sm btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
+                Choose a plan
+              </a>
+            </div>
+          )}
+          {!onboarding.setupDone && project && root === 'p' && (
+            <div className="trial-banner rise">
+              <Icons.check size={16} />
+              <span>Finish setting up Lumora — it takes about five minutes.</span>
+              <a className="btn btn-sm" href="#/setup" style={{ textDecoration: 'none' }}>
+                Continue setup
+              </a>
+            </div>
+          )}
+          {page}
+        </main>
       </div>
+      {helpOpen && <HelpPanel me={me} project={project} onClose={() => setHelpOpen(false)} onTour={startTour} />}
+      {touring && <Tour steps={tourSteps(me)} onDone={endTour} />}
+      {celebrate && !touring && (
+        <WelcomeModal
+          me={me}
+          onClose={() => void saveOnboarding({ seenPlan: true })}
+          onTour={() => {
+            void saveOnboarding({ seenPlan: true });
+            startTour();
+          }}
+        />
+      )}
     </div>
   );
 }

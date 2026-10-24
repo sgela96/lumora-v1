@@ -71,6 +71,7 @@ export const config = {
     model: env('LUMORA_AI_MODEL', 'claude-opus-5-5'),
   },
   trialDays: Number(env('LUMORA_TRIAL_DAYS', '14')),
+  supportEmail: env('LUMORA_SUPPORT_EMAIL', 'support@lumora.app'),
 };
 
 export const billingEnabled = () => !!config.stripe.secretKey;

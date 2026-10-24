@@ -2,7 +2,8 @@ import { INTEGRATION_CATEGORIES, minimumPlanForIntegration, PLANS, type Integrat
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type ConnectorInfo, type Integration, type Project } from '../api';
 import { Icons, LogoTile } from '../components/icons';
-import { Card, CopyButton, Field, SectionIntro, Switch, UpgradeBadge, useToast } from '../components/ui';
+import { Card, CopyButton, Field, SectionIntro, Switch, timeAgo, UpgradeBadge, useToast } from '../components/ui';
+import { SETUP_GUIDES, troubleshoot } from '../guides';
 import { navigate, useApp } from '../state';
 
 const ORDER: IntegrationCategory[] = ['trackers', 'helpdesks', 'enterprise', 'messaging'];
@@ -137,10 +138,10 @@ export function IntegrationsPage({ project }: { project: Project }) {
   );
 }
 
-function IntegrationForm({
+export function IntegrationForm({
   project,
   connector,
-  integration,
+  integration: initial,
   categories,
   showHook,
   onCancel,
@@ -155,11 +156,16 @@ function IntegrationForm({
   onSaved: () => void;
 }) {
   const toast = useToast();
-  const [name, setName] = useState(integration?.name ?? connector.label);
-  const [config, setConfig] = useState<Record<string, string>>(integration?.config ?? {});
-  const [only, setOnly] = useState<string[]>(integration?.categories ?? []);
+  // Once saved, the form keeps editing the saved destination (so a failed test can be fixed in place).
+  const [integration, setIntegration] = useState(initial);
+  const [name, setName] = useState(initial?.name ?? connector.label);
+  const [config, setConfig] = useState<Record<string, string>>(initial?.config ?? {});
+  const [only, setOnly] = useState<string[]>(initial?.categories ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [guideOpen, setGuideOpen] = useState(!initial);
+  const guide = SETUP_GUIDES[connector.type];
+  const tip = error ? troubleshoot(error) : null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -170,9 +176,14 @@ function IntegrationForm({
       const saved = integration
         ? await api<Integration>(`/integrations/${integration.id}`, { method: 'PATCH', body })
         : await api<Integration>(`/projects/${project.id}/integrations`, { body });
+      setIntegration(saved);
       const result = await api<{ ok: boolean; message: string }>(`/integrations/${saved.id}/test`, { body: {} });
-      toast(result.ok ? `Connected — ${result.message}` : `Saved, but the test failed: ${result.message}`, !result.ok);
-      onSaved();
+      if (result.ok) {
+        toast(`Connected — ${result.message}`);
+        onSaved();
+      } else {
+        setError(`Saved, but the connection test failed: ${result.message}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       if (err instanceof ApiError && err.code === 'upgrade') toast('Upgrade your plan to add this destination', true);
@@ -185,12 +196,27 @@ function IntegrationForm({
     <Card
       title={
         <span className="row" style={{ gap: 10 }}>
-          <LogoTile type={connector.type} /> {integration ? 'Edit' : 'Connect'} {connector.label}
+          <LogoTile type={connector.type} /> {initial ? 'Edit' : 'Connect'} {connector.label}
         </span>
       }
     >
       <form className="stack" onSubmit={submit}>
         <p className="muted">{connector.description}</p>
+        {guide && (
+          <div className="guide">
+            <button type="button" className="guide-toggle" aria-expanded={guideOpen} onClick={() => setGuideOpen(!guideOpen)}>
+              <Icons.help size={15} /> Where do I find this?
+              <span className="muted">{guideOpen ? '−' : '+'}</span>
+            </button>
+            {guideOpen && (
+              <ol className="guide-steps">
+                {guide.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
         <Field label="Name">
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -221,33 +247,106 @@ function IntegrationForm({
             </div>
           </Field>
         )}
-        {connector.syncsStatus && showHook && (
-          <div className="notice stack-sm">
-            <strong>Live status updates</strong>
-            <span>
-              Lumora checks the status of linked {connector.label} tickets every couple of minutes. For instant updates, add this URL as a webhook in{' '}
-              {connector.label} (issue/ticket updated events):
-            </span>
-            {integration?.hookUrl ? (
-              <div className="row" style={{ flexWrap: 'nowrap' }}>
-                <code style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{integration.hookUrl}</code>
-                <CopyButton text={integration.hookUrl} />
-              </div>
-            ) : (
-              <span className="muted small">The URL appears here once the destination is saved.</span>
+        {connector.syncsStatus && showHook && <StatusHook connector={connector} integration={integration} onChange={setIntegration} />}
+        {error && (
+          <div className="notice notice-danger stack-sm">
+            <span>{error}</span>
+            {tip && (
+              <span>
+                <strong>What to check: </strong>
+                {tip}
+              </span>
             )}
           </div>
         )}
-        {error && <div className="notice notice-danger">{error}</div>}
         <div className="row">
           <button className="btn btn-primary" disabled={busy}>
             {busy ? 'Connecting…' : integration ? 'Save and test' : 'Connect and test'}
           </button>
-          <button type="button" className="btn" onClick={onCancel}>
-            Cancel
+          <button type="button" className="btn" onClick={integration && !initial ? onSaved : onCancel}>
+            {integration && !initial ? 'Done' : 'Cancel'}
           </button>
         </div>
       </form>
     </Card>
+  );
+}
+
+/** Live status: one click when the tool's API allows it, otherwise the URL with step-by-step instructions. */
+function StatusHook({ connector, integration, onChange }: { connector: ConnectorInfo; integration?: Integration; onChange: (i: Integration) => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [manual, setManual] = useState(false);
+  if (!integration?.hookUrl) {
+    return (
+      <div className="notice stack-sm">
+        <strong>Live status updates</strong>
+        <span className="muted small">Once connected, you can make {connector.label} tell Lumora about status changes instantly.</span>
+      </div>
+    );
+  }
+  const auto = async () => {
+    setBusy(true);
+    try {
+      const result = await api<{ ok: boolean; message: string }>(`/integrations/${integration.id}/auto-hook`, { body: {} });
+      if (result.ok) {
+        onChange({ ...integration, hookConfigured: true });
+        toast(result.message);
+      } else {
+        const tip = troubleshoot(result.message);
+        toast(`${result.message}${tip ? ` — ${tip}` : ''}`, true);
+        setManual(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  const health = integration.lastHookAt ? (
+    <span className="hook-health ok">
+      <span className="dot" /> Last update received {timeAgo(integration.lastHookAt)}
+    </span>
+  ) : integration.hookConfigured ? (
+    <span className="hook-health">
+      <span className="dot" /> Webhook set up — waiting for the first status change
+    </span>
+  ) : null;
+  const showSteps = manual || !integration.autoHook;
+  return (
+    <div className="notice stack-sm">
+      <div className="spread">
+        <strong>Live status updates</strong>
+        {health}
+      </div>
+      <span>
+        Lumora checks linked {connector.label} tickets every couple of minutes. For instant updates, let {connector.label} notify Lumora when a ticket changes.
+      </span>
+      {integration.autoHook && !integration.hookConfigured && (
+        <div className="row">
+          <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={auto}>
+            <Icons.sync size={13} /> {busy ? 'Setting up…' : 'Set up automatically'}
+          </button>
+          {!manual && (
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setManual(true)}>
+              I’ll do it myself
+            </button>
+          )}
+        </div>
+      )}
+      {showSteps && !integration.hookConfigured && (
+        <>
+          {integration.webhookGuide.length > 0 && (
+            <ol className="guide-steps">
+              {integration.webhookGuide.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ol>
+          )}
+          <div className="row" style={{ flexWrap: 'nowrap' }}>
+            <code style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{integration.hookUrl}</code>
+            <CopyButton text={integration.hookUrl} />
+          </div>
+        </>
+      )}
+    </div>
   );
 }

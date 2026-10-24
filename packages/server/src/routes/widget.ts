@@ -4,7 +4,7 @@ import type { ReportPayload, WidgetConfig } from '@lumora/shared';
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import { config } from '../config';
-import { one } from '../db';
+import { one, run } from '../db';
 import {
   accountLimits,
   accountPlan,
@@ -72,6 +72,7 @@ export function widgetRouter(): Router {
     const project = findProject(req.query.key);
     if (!originAllowed(project, req.headers.origin)) throw new HttpError(403, 'This site is not allowed to use this widget key');
     const account = getAccount(project.account_id);
+    markInstalled(project, req.headers.origin);
     const body: WidgetConfig = { projectName: project.name, plan: accountPlan(account), settings: effectiveSettings(project, accountLimits(account)) };
     // Revalidated on every load (cheap thanks to the ETag) so dashboard changes show up immediately.
     res.setHeader('Cache-Control', 'no-cache');
@@ -105,6 +106,13 @@ export function widgetRouter(): Router {
   );
 
   return router;
+}
+
+/** The first time the widget loads on the customer's own site, the setup wizard can tick "Installed". */
+function markInstalled(project: ProjectRow, origin: string | undefined): void {
+  if (!origin || origin === new URL(config.publicUrl).origin) return; // dashboard preview / demo page
+  if (project.installed_at && project.installed_origin === origin) return;
+  run('UPDATE projects SET installed_at = COALESCE(installed_at, ?), installed_origin = ? WHERE id = ?', new Date().toISOString(), origin, project.id);
 }
 
 function parsePayload(raw: unknown): ReportPayload {

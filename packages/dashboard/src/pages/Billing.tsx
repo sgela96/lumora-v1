@@ -1,11 +1,30 @@
 import { monthlyPrice, PLAN_ORDER, type AddonId, type AddonQuantities, type PlanId } from '@lumora/shared';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api } from '../api';
 import { Icons } from '../components/icons';
 import { Card, PageHead, useToast } from '../components/ui';
 import { useApp } from '../state';
 
 /** The full matrix behind "Compare all features" — the cards above stay short. */
+/** Back from Stripe Checkout: the webhook may land a few seconds later, so wait for it before celebrating. */
+function PaymentStatus() {
+  const { me, refresh } = useApp();
+  const [tries, setTries] = useState(0);
+  const confirmed = me.account.planStatus === 'active' && me.account.plan !== 'free';
+  useEffect(() => {
+    if (confirmed || tries >= 15) return;
+    const t = setTimeout(() => refresh().finally(() => setTries((n) => n + 1)), 2000);
+    return () => clearTimeout(t);
+  }, [confirmed, tries, refresh]);
+  if (confirmed) return <div className="notice notice-accent">Payment confirmed — your {me.limits.name} plan is active. A receipt is on its way to your inbox.</div>;
+  if (tries >= 15) return <div className="notice">We’re still waiting for the payment confirmation. It can take a minute; this page updates on its own — or refresh later.</div>;
+  return (
+    <div className="notice row" style={{ gap: 10 }}>
+      <span className="pulse-dot" aria-hidden /> Confirming your payment…
+    </div>
+  );
+}
+
 const COMPARE: { group: string; rows: [string, string, string, string][] }[] = [
   {
     group: 'Widget',
@@ -60,6 +79,7 @@ export function BillingPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [addons, setAddons] = useState<AddonQuantities>(me.account.addons ?? {});
   const [showCompare, setShowCompare] = useState(false);
+  const [returning] = useState(() => location.hash.includes('checkout=success'));
   const current = me.account.chosenPlan ?? me.account.plan;
   const trialing = me.account.planStatus === 'trialing';
   const addonsDirty = JSON.stringify(addons) !== JSON.stringify(me.account.addons ?? {});
@@ -112,7 +132,7 @@ export function BillingPage() {
         }
       />
       {!me.server.billingEnabled && <div className="notice">Billing isn’t configured on this server (no STRIPE_SECRET_KEY), so you can switch plans and extras freely to try them.</div>}
-      {location.hash.includes('checkout=success') && <div className="notice notice-accent">Thanks! Your subscription is active.</div>}
+      {returning && <PaymentStatus />}
 
       <div className="grid-3">
         {PLAN_ORDER.map((id) => {

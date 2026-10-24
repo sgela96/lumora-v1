@@ -16,12 +16,17 @@ import { config } from '../config';
 import { connectorCatalog, getConnector } from '../connectors';
 import { all, one, run, transaction } from '../db';
 import { aiAvailable } from '../lib/ai';
+import { resetPasswordMail, sendMail, welcomeMail } from '../lib/mail';
 import { transcriptionAvailable } from '../lib/transcribe';
 import { centerRouter } from './center';
-import { hashPassword, id, randomToken, verifyPassword } from '../lib/crypto';
+import { hashPassword, id, randomToken, sha256, verifyPassword } from '../lib/crypto';
+import type { Connector } from '../connectors/types';
 import {
   accountAddons,
   accountLimits,
+  accountOnboarding,
+  planKey,
+  type HookCapable,
   accountPlan,
   canUseIntegration,
   deliverTicket,
@@ -63,13 +68,14 @@ export function appRouter(): Router {
     const accountId = id('acc');
     const userId = id('usr');
     const trialEnds = new Date(Date.now() + config.trialDays * 86400_000).toISOString();
-    transaction(() => {
+    const project = transaction(() => {
       // New accounts get a Pro trial: they see the full product before choosing a tier.
-      run('INSERT INTO accounts (id, name, plan, plan_status, trial_ends_at) VALUES (?, ?, ?, ?, ?)', accountId, company, 'pro', 'trialing', trialEnds);
+      run('INSERT INTO accounts (id, name, plan, plan_status, trial_ends_at, onboarding) VALUES (?, ?, ?, ?, ?, ?)', accountId, company, 'pro', 'trialing', trialEnds, JSON.stringify({ seenPlan: 'pro|trial|' }));
       run('INSERT INTO users (id, account_id, email, name, password_hash) VALUES (?, ?, ?, ?, ?)', userId, accountId, email, name, passwordHash);
-      createProject(accountId, company);
+      return createProject(accountId, company);
     });
     startSession(res, userId);
+    void sendMail(welcomeMail(email, name, `<script src="${config.publicUrl}/lumora.js" data-key="${project.public_key}" async></script>`));
     res.status(201).json({ ok: true });
   });
 
@@ -78,6 +84,30 @@ export function appRouter(): Router {
     const password = typeof req.body.password === 'string' ? req.body.password : '';
     const user = one<{ id: string; password_hash: string }>('SELECT id, password_hash FROM users WHERE email = ?', email);
     if (!user || !(await verifyPassword(password, user.password_hash))) throw new HttpError(401, 'Wrong e-mail or password');
+    startSession(res, user.id);
+    res.json({ ok: true });
+  });
+
+  /** Always answers the same, so it can't be used to find out which e-mails have accounts. */
+  router.post('/auth/forgot', async (req, res) => {
+    const email = str(req.body.email, 200).toLowerCase();
+    const user = one<{ id: string; email: string }>('SELECT id, email FROM users WHERE email = ?', email);
+    if (user) {
+      const token = randomToken();
+      run('UPDATE users SET reset_token_hash = ?, reset_expires_at = ? WHERE id = ?', sha256(token), new Date(Date.now() + 3600_000).toISOString(), user.id);
+      void sendMail(resetPasswordMail(user.email, token));
+    }
+    res.json({ ok: true });
+  });
+
+  router.post('/auth/reset', async (req, res) => {
+    const token = str(req.body.token, 200);
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (password.length < 8) throw new HttpError(400, 'Password must have at least 8 characters');
+    const user = one<{ id: string; reset_expires_at: string | null }>('SELECT id, reset_expires_at FROM users WHERE reset_token_hash = ?', sha256(token));
+    if (!user || !user.reset_expires_at || new Date(user.reset_expires_at) < new Date()) throw new HttpError(400, 'This link expired. Ask for a new one.');
+    run('UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_expires_at = NULL WHERE id = ?', await hashPassword(password), user.id);
+    run('DELETE FROM sessions WHERE user_id = ?', user.id);
     startSession(res, user.id);
     res.json({ ok: true });
   });
@@ -101,6 +131,8 @@ export function appRouter(): Router {
         chosenPlan: account.plan,
         addons: accountAddons(account),
         planStatus: account.plan_status,
+        planKey: planKey(account),
+        onboarding: accountOnboarding(account),
         trialEndsAt: account.trial_ends_at,
         active: subscriptionActive(account),
         hasBillingCustomer: !!account.stripe_customer_id,
@@ -113,8 +145,19 @@ export function appRouter(): Router {
         aiAvailable: aiAvailable(),
         transcriptionAvailable: transcriptionAvailable(),
         emailAvailable: !!config.smtp.url,
+        supportEmail: config.supportEmail,
       },
     });
+  });
+
+  router.patch('/me/onboarding', (req, res) => {
+    const account = getAccount(req.user!.accountId);
+    const state = accountOnboarding(account);
+    if (typeof req.body.setupDone === 'boolean') state.setupDone = req.body.setupDone;
+    if (typeof req.body.tourDone === 'boolean') state.tourDone = req.body.tourDone;
+    if (req.body.seenPlan === true) state.seenPlan = planKey(account);
+    run('UPDATE accounts SET onboarding = ? WHERE id = ?', JSON.stringify(state), account.id);
+    res.json(state);
   });
 
   router.get('/catalog', (_req, res) => {
@@ -124,13 +167,14 @@ export function appRouter(): Router {
   // ------------------------------------------------------------ Projects
 
   router.get('/projects', (req, res) => {
-    const rows = all<ProjectRow & { tickets: number; last_ticket: string | null }>(
+    const rows = all<ProjectRow & { tickets: number; destinations: number; last_ticket: string | null }>(
       `SELECT p.*, (SELECT COUNT(*) FROM tickets t WHERE t.project_id = p.id) AS tickets,
+              (SELECT COUNT(*) FROM integrations i WHERE i.project_id = p.id AND i.enabled = 1) AS destinations,
               (SELECT MAX(created_at) FROM tickets t WHERE t.project_id = p.id) AS last_ticket
        FROM projects p WHERE account_id = ? ORDER BY created_at`,
       req.user!.accountId,
     );
-    res.json(rows.map((r) => ({ ...serializeProject(r), tickets: r.tickets, lastTicketAt: r.last_ticket })));
+    res.json(rows.map((r) => ({ ...serializeProject(r), tickets: r.tickets, destinations: r.destinations, lastTicketAt: r.last_ticket })));
   });
 
   router.post('/projects', (req, res) => {
@@ -206,6 +250,8 @@ export function appRouter(): Router {
       categories: JSON.stringify(cleanCategories(req.body.categories)),
       enabled: 1,
       hook_token: randomToken(24),
+      last_hook_at: null,
+      remote_hook_id: null,
       created_at: new Date().toISOString(),
     };
     run(
@@ -243,8 +289,28 @@ export function appRouter(): Router {
     res.json(serializeIntegration(one<IntegrationRow>('SELECT * FROM integrations WHERE id = ?', row.id)!));
   });
 
-  router.delete('/integrations/:id', (req, res) => {
+  /** Creates the status webhook in the remote tool (Jira, GitHub…) so status updates arrive instantly. */
+  router.post('/integrations/:id/auto-hook', async (req, res) => {
     const row = ownedIntegration(req);
+    const connector = getConnector(row.type) as (Connector & HookCapable) | undefined;
+    if (!connector?.registerStatusWebhook || !row.hook_token) throw new HttpError(400, 'This tool needs the webhook to be added by hand — follow the guide.');
+    const url = `${config.publicUrl}/api/hooks/status/${row.id}/${row.hook_token}`;
+    try {
+      const created = await connector.registerStatusWebhook(integrationConfig(row), url);
+      run('UPDATE integrations SET remote_hook_id = ? WHERE id = ?', created.id, row.id);
+      res.json({ ok: true, message: created.note ?? 'Webhook created — status changes now arrive instantly.' });
+    } catch (error) {
+      res.json({ ok: false, message: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  router.delete('/integrations/:id', async (req, res) => {
+    const row = ownedIntegration(req);
+    const connector = getConnector(row.type) as (Connector & HookCapable) | undefined;
+    // Best effort: remove the webhook we created in the remote tool.
+    if (row.remote_hook_id && connector?.unregisterStatusWebhook) {
+      await connector.unregisterStatusWebhook(integrationConfig(row), row.remote_hook_id).catch(() => {});
+    }
     run('DELETE FROM integrations WHERE id = ?', row.id);
     res.json({ ok: true });
   });

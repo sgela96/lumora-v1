@@ -84,10 +84,17 @@ export function UpgradeBadge({ plan, label }: { plan: PlanId; label?: string }) 
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+export function Field({ label, hint, action, children }: { label: string; hint?: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="field">
-      <label>{label}</label>
+      {action ? (
+        <div className="spread">
+          <label>{label}</label>
+          {action}
+        </div>
+      ) : (
+        <label>{label}</label>
+      )}
       {children}
       {hint && <span className="hint">{hint}</span>}
     </div>

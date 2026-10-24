@@ -28,7 +28,7 @@ function App() {
   const setMe = useCallback((me: Me) => setBoot((b) => (b.status === 'ready' ? { ...b, me } : b)), []);
 
   if (boot.status === 'loading') return <div className="auth-wrap"><Nebula className="mark" /></div>;
-  if (boot.status === 'anonymous') return <AuthPage onDone={load} />;
+  if (boot.status === 'anonymous' || (boot.status === 'ready' && location.hash.startsWith('#/reset'))) return <AuthPage onDone={load} />;
   if (boot.status === 'error') return <div className="auth-wrap"><div className="notice notice-danger">{boot.message}</div></div>;
   return (
     <AppProvider me={boot.me} catalog={boot.catalog} initialProjects={boot.projects} onMe={setMe}>

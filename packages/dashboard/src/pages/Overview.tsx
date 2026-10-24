@@ -4,6 +4,7 @@ import { BarList, Legend, Sparkline, TrendChart, useCountUp, type Series } from 
 import { Icons, LogoTile } from '../components/icons';
 import { Card, formatHours, Nebula, Segmented, timeAgo, Upsell } from '../components/ui';
 import { navigate, useApp } from '../state';
+import { setupProgress } from './Setup';
 
 const SERIES: Series[] = [
   { key: 'created', label: 'Reports', color: '--series-reports' },
@@ -39,6 +40,7 @@ export function OverviewPage({ project }: { project: Project }) {
     return (
       <div className="stack rise">
         <Hero name={me.user.name} lede={<>Your reports go straight to {project.name}’s destinations.</>} />
+        <GettingStarted project={project} />
         <div style={{ display: 'grid', placeItems: 'center', padding: '24px 0' }}>
           <Upsell title="See how your app is doing" cta="Upgrade to Pro">
             Pro adds a dashboard with your report volume, trends, categories and the latest reports — plus screen recordings that turn into written steps.
@@ -89,6 +91,8 @@ export function OverviewPage({ project }: { project: Project }) {
           )
         }
       />
+
+      <GettingStarted project={project} />
 
       {metrics.level === 'advanced' ? <AdvancedTiles m={metrics} onOpen={() => reportsLink({ status: 'open' })} /> : <BasicTiles m={metrics} />}
 
@@ -173,6 +177,38 @@ export function OverviewPage({ project }: { project: Project }) {
         </>
       )}
     </div>
+  );
+}
+
+/** Stays on the Overview until the app is installed, connected and has received a report. */
+function GettingStarted({ project }: { project: Project }) {
+  const progress = setupProgress(project);
+  if (progress.done === progress.total) return null;
+  return (
+    <section className="card card-pad getting-started iris-border lift">
+      <div className="spread">
+        <div>
+          <h2 style={{ fontSize: 19 }}>Getting started</h2>
+          <p className="muted small">
+            {progress.done} of {progress.total} done — finish to get complete tickets in your tool.
+          </p>
+        </div>
+        <a className="btn btn-primary btn-sm" href="#/setup" style={{ textDecoration: 'none' }}>
+          Continue setup
+        </a>
+      </div>
+      <div className="meter" style={{ margin: '14px 0 6px' }}>
+        <span style={{ width: `${(progress.done / progress.total) * 100}%` }} />
+      </div>
+      <ol className="checklist">
+        {progress.steps.map((s) => (
+          <li key={s.id} className={s.done ? 'done' : ''}>
+            <span className="setup-dot">{s.done ? <Icons.check size={13} /> : null}</span>
+            {s.title}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

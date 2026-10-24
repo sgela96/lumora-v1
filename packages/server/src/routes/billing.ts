@@ -4,6 +4,7 @@ import express, { Router } from 'express';
 import { requireJsonForMutations, requireUser } from '../auth';
 import { billingEnabled, config } from '../config';
 import { one, run } from '../db';
+import { planActivatedMail, sendMail } from '../lib/mail';
 import { getAccount, HttpError } from '../services';
 
 // Stripe is called over its REST API directly: a handful of endpoints and a webhook don't justify the SDK.
@@ -107,6 +108,11 @@ function applySubscriptionObject(sub: Record<string, any>, deleted: boolean): vo
   const { plan, addons } = fromStripeItems((sub.items?.data ?? []) as StripeItem[]);
   // Stripe statuses: active, trialing, past_due, unpaid, incomplete… only active/trialing grant the paid plan.
   const status = ['active', 'trialing'].includes(String(sub.status)) ? 'active' : String(sub.status);
+  const before = one<{ plan: string; plan_status: string }>('SELECT plan, plan_status FROM accounts WHERE id = ?', account.id);
+  if (status === 'active' && plan && plan !== 'free' && (before?.plan !== plan || before?.plan_status !== 'active')) {
+    const user = one<{ email: string; name: string }>('SELECT email, name FROM users WHERE account_id = ? ORDER BY created_at LIMIT 1', account.id);
+    if (user) void sendMail(planActivatedMail(user.email, user.name, PLANS[plan].name, PLANS[plan].highlights));
+  }
   run(
     'UPDATE accounts SET plan = COALESCE(?, plan), plan_status = ?, addons = ?, stripe_subscription_id = ? WHERE id = ?',
     plan ?? null,

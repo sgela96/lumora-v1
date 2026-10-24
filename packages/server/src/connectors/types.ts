@@ -61,4 +61,9 @@ export interface Connector {
    * send()). Absent for destinations without a workflow (webhook, Slack, e-mail).
    */
   fetchStatus?(config: ConnectorConfig, externalId: string): Promise<ExternalStatus>;
+  /** Creates the status webhook in the remote tool, pointing at `url`. Returns the remote hook id. */
+  registerStatusWebhook?(config: ConnectorConfig, url: string): Promise<{ id: string; note?: string }>;
+  unregisterStatusWebhook?(config: ConnectorConfig, id: string): Promise<void>;
+  /** Steps to add the status webhook by hand, for tools whose API can't create it. */
+  webhookGuide?: string[];
 }
