@@ -697,3 +697,35 @@ button.nav-link { width: 100%; border: 0; background: none; font: inherit; text-
 .md-preview code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
 .md-preview blockquote { margin: 6px 0; padding: 8px 12px; border-left: 3px solid #b07ad8; border-radius: 0 10px 10px 0; background: var(--fill); }
 .md-preview a { color: var(--info); }
+
+/* ---------- Data capture ---------- */
+.capture-summary { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; }
+.capture-summary .label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.chip.on { background: var(--accent-soft); color: var(--text); padding: 4px 10px; }
+.chip.safe { background: var(--ok-soft); color: var(--ok); padding: 4px 10px; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); padding: 4px 10px; }
+.chip svg { display: block; }
+.capture-grid { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+.capture-nav { position: sticky; top: 20px; display: grid; gap: 2px; }
+.capture-nav a { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; color: var(--text-2); font-size: 13.5px; text-decoration: none; }
+.capture-nav a:hover { background: var(--fill); color: var(--text); }
+.capture-nav svg { display: block; flex: none; }
+.capture-section { scroll-margin-top: 20px; }
+.capture-head { display: flex; gap: 14px; align-items: flex-start; padding: 18px 20px 0; }
+.capture-head h2 { font-size: 17px; }
+.capture-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 11px; background: var(--accent-soft); color: var(--accent-ink); }
+.capture-icon svg { display: block; }
+.capture-body { padding-top: 8px; }
+.capture-options { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.capture-options .field label { min-height: 18px; }
+.level-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.level-chip { padding: 5px 11px; border: 0; border-radius: 999px; background: var(--fill); color: var(--muted); font: inherit; font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; cursor: pointer; }
+.level-chip[aria-pressed="true"] { color: var(--text); box-shadow: inset 0 0 0 1.5px currentColor; }
+.level-chip.level-error[aria-pressed="true"] { color: var(--danger); background: var(--danger-soft); }
+.level-chip.level-warn[aria-pressed="true"] { color: var(--warn); background: var(--warn-soft); }
+.level-chip.level-info[aria-pressed="true"] { color: var(--info); background: var(--info-soft); }
+.user-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 24px; border-bottom: .5px solid var(--separator); }
+/* Same rhythm in both columns: every cell gets the full padding and a bottom rule except the last row. */
+.user-grid > .toggle-row, .user-grid > .toggle-row:first-child { padding: 12px 0; }
+.user-grid > .toggle-row:nth-last-child(-n+2) { border-bottom: 0; }
+@media (max-width: 900px) { .capture-grid, .capture-summary, .user-grid { grid-template-columns: minmax(0, 1fr); } .capture-nav { display: none; } }
