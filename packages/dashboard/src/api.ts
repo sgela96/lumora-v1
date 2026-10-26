@@ -101,7 +101,43 @@ export interface Delivery {
   url?: string;
   error?: string;
   at: string;
-  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string };
+  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string; assignee?: Assignee | null };
+}
+
+export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export const PRIORITIES: Priority[] = ['urgent', 'high', 'medium', 'low'];
+
+export interface Assignee {
+  name: string;
+  email?: string | null;
+}
+
+/** A status of the connected tool (Jira, Zendesk…) and the Lumora category it maps to. */
+export interface RemoteStatus {
+  name: string;
+  category: TicketStatus;
+}
+
+export interface Workflow {
+  source: 'tool' | 'lumora';
+  tool?: { integrationId: string; type: string; name: string };
+  statuses: RemoteStatus[];
+  error?: string;
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  query: string;
+  layout: { mode?: 'list' | 'board'; groupBy?: string; columns?: string[] };
+}
+
+export interface ReminderChannel {
+  integrationId: string;
+  type: string;
+  name: string;
+  /** Slack with a bot token can message the assignee directly. */
+  direct: boolean;
 }
 
 export interface TicketSummary {
@@ -121,6 +157,8 @@ export interface TicketSummary {
   browser: string | null;
   os: string | null;
   errorCount: number;
+  priority: Priority | null;
+  assignee: Assignee | null;
   deliveries: Delivery[];
   hasScreenshot: boolean;
   hasRecording: boolean;
@@ -151,7 +189,7 @@ export interface TicketList {
   total: number;
   items: TicketSummary[];
   counts: Record<TicketStatus | 'all', number>;
-  facets: Record<'category' | 'browser' | 'page', { value: string; n: number }[]>;
+  facets: Record<'category' | 'browser' | 'page' | 'assignee' | 'external', { value: string; n: number }[]>;
   historyDays: number;
 }
 

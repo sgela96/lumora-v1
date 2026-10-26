@@ -32,15 +32,19 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 - **Overview**: reportes del período y variación, abiertos ahora, tiempo mediano de resolución, % con errores, gráfico diario de reportes vs. resueltos (con tooltip y vista de tabla), top issues, páginas donde la gente se traba, categorías, navegadores y forma de reporte. Los gráficos usan una paleta validada para daltonismo y contraste, en claro y oscuro.
 - **Reports**: estados *Open / In progress / Resolved* con contadores, búsqueda, filtros (categoría, tipo de captura, página, navegador, fecha, con errores, con grabación, entrega fallida) que quedan en la URL para compartir, y vista **agrupada por issue**: reportes con el mismo error (aunque cambien IDs o números) se juntan, con cantidad de personas afectadas, primera y última vez visto.
 - **Estado sincronizado**: cada reporte muestra el estado real del ticket vinculado ("In Review", "Pending", "Resolved"…). Lumora consulta las herramientas cada 2 minutos (`LUMORA_SYNC_INTERVAL_SEC`) y cada integración tiene una URL de webhook secreta para actualizaciones instantáneas. Sin ticket vinculado, el estado se cambia a mano.
+- **Estados del tool como pick list**: el selector de estado ofrece el workflow real de la herramienta conectada (Jira, Zendesk, GitHub, GitLab, Linear), agrupado por categoría (To do / In progress / Done). Elegir uno mueve el ticket allá (en Jira, con la transición correspondiente) y lo vuelve a leer. También trae el **asignado**.
+- **Lista y board**: columnas configurables, orden por prioridad o fecha, selección múltiple con acciones en lote (estado, prioridad), y un **board** agrupable por estado, prioridad, categoría o asignado con drag & drop. **Vistas guardadas** con filtros, orden, layout y columnas.
+- **Prioridad**: sugerida por AI Powered o puesta por el equipo (Urgent / High / Medium / Low).
+- **Recordatorios**: desde un reporte, "Send a reminder" avisa al asignado por Slack (mensaje directo si la integración tiene bot token, si no, post en el canal) o Microsoft Teams (post en el canal).
 
-### Integraciones (19)
+### Integraciones (20)
 
 | Tipo | Herramientas | Sincroniza estado |
 |---|---|---|
 | Issue / defect trackers | Jira, Azure DevOps, GitHub Issues, GitLab, Linear, ClickUp, Asana, Shortcut, YouTrack, Trello | ✓ |
 | Help desks | Zendesk, Freshdesk, HubSpot | ✓ |
 | Enterprise service management | Salesforce Service Cloud, ServiceNow, Freshservice | ✓ |
-| Mensajería y automatización | Webhook (firmado HMAC), Slack, E-mail | — |
+| Mensajería y automatización | Webhook (firmado HMAC), Slack, Microsoft Teams, E-mail | — (Slack y Teams envían recordatorios al asignado en Business) |
 
 El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{fields.category}}`…) convertido al formato de cada herramienta. Las secciones vacías se eliminan solas.
 
@@ -53,7 +57,7 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 | Captura + anotación, consola y entorno | ✓ | ✓ | ✓ |
 | Grabación con voz → pasos escritos | — | 2 min | 10 min |
 | Red y últimas acciones del usuario | — | ✓ | ✓ |
-| Destinos | 1 destino: Jira, GitHub, Linear, Slack, webhook o e-mail | + los 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
+| Destinos | 1 destino: Jira, GitHub, Linear, Slack, Teams, webhook o e-mail | + los 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
 | Template propio | — | ✓ | ✓ |
 | Sin "Powered by Lumora" (marca blanca) | — | — | ✓ |
 | Dashboard | — | Básica | Avanzada |
@@ -135,7 +139,7 @@ site/         web de marketing, servida en /
 
 - **AppExchange**: publicar un paquete gestionado de Salesforce con un componente LWC/Experience Cloud que cargue el widget y un flujo de OAuth en lugar de "Consumer key/secret", más la revisión de seguridad de Salesforce. El conector de Case ya está.
 - Probar cada conector contra una cuenta real (hoy están verificados con tests que simulan las APIs).
-- Support Center: asignación a agentes, notas internas, vistas guardadas, alertas cuando un issue crece, métricas entre todas las apps.
+- Support Center: asignar desde Lumora, notas internas, alertas cuando un issue crece, métricas entre todas las apps.
 - Más destinos: monday.com, Intercom, Notion, Azure Boards on-premise.
 - Equipo / roles en el back office, SSO para Business, retención configurable de adjuntos, almacenamiento en S3.
 - Back office en español (el widget ya es bilingüe).

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import { NEBULA_CSS, nebulaSvg, PLANS, type PlanId, type TicketStatus } from '@lumora/shared';
+import { PRIORITIES, type Priority, type RemoteStatus } from '../api';
 import { Icons } from './icons';
 
 // The nebula animations are shared with the widget; inject them once.
@@ -168,15 +169,13 @@ export function StatusBadge({ status, label }: { status: TicketStatus; label?: s
 
 export const statusLabel = (s: TicketStatus) => STATUS_META[s].label;
 
-/** A status pick list: the current status as a pill that opens the list of statuses. */
-export function StatusPicker({ value, onChange, disabled }: { value: TicketStatus; onChange: (s: TicketStatus) => void | Promise<void>; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+/** Closes a popover on outside click or Escape. */
+export function useDismiss(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close();
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && close();
     document.addEventListener('mousedown', away);
     document.addEventListener('keydown', esc);
     return () => {
@@ -184,9 +183,43 @@ export function StatusPicker({ value, onChange, disabled }: { value: TicketStatu
       document.removeEventListener('keydown', esc);
     };
   }, [open]);
-  const pick = async (s: TicketStatus) => {
+  return ref;
+}
+
+const CATEGORY_HEAD: Record<TicketStatus, string> = { open: 'To do', in_progress: 'In progress', resolved: 'Done' };
+const LUMORA_STATUSES: RemoteStatus[] = (Object.keys(STATUS_META) as TicketStatus[]).map((s) => ({ name: STATUS_META[s].label, category: s }));
+
+/**
+ * A status pick list: the current status as a pill that opens the list. With a connected tool the list is the
+ * tool's own workflow (Jira, Zendesk…), grouped by the Lumora category each status maps to.
+ */
+export function StatusPicker({
+  value,
+  label,
+  statuses,
+  onChange,
+  disabled,
+  align = 'right',
+  placeholder,
+}: {
+  value: TicketStatus;
+  label?: string | null;
+  statuses?: RemoteStatus[];
+  onChange: (s: RemoteStatus) => void | Promise<void>;
+  disabled?: boolean;
+  align?: 'left' | 'right';
+  /** Bulk mode: a neutral trigger with this text, and no current value. */
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const list = statuses?.length ? statuses : LUMORA_STATUSES;
+  const fromTool = list !== LUMORA_STATUSES;
+  const current = placeholder ? null : (fromTool && label ? list.find((s) => s.name.toLowerCase() === label.toLowerCase()) : null) ?? list.find((s) => s.category === value && !fromTool) ?? null;
+  const pick = async (s: RemoteStatus) => {
     setOpen(false);
-    if (s === value) return;
+    if (current && s.name === current.name) return;
     setBusy(true);
     try {
       await onChange(s);
@@ -195,29 +228,118 @@ export function StatusPicker({ value, onChange, disabled }: { value: TicketStatu
     }
   };
   const meta = STATUS_META[value] ?? STATUS_META.open;
+  const groups = (Object.keys(STATUS_META) as TicketStatus[]).map((c) => ({ category: c, items: list.filter((s) => s.category === c) })).filter((g) => g.items.length);
   return (
-    <div className="status-picker" ref={ref}>
-      <button type="button" className={`status-trigger badge ${meta.cls}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}>
-        <span className={meta.dot} aria-hidden />
-        {busy ? 'Saving…' : meta.label}
+    <div className="status-picker" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className={`status-trigger badge ${placeholder ? 'prio-trigger' : meta.cls}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}>
+        {!placeholder && <span className={meta.dot} aria-hidden />}
+        {busy ? 'Saving…' : placeholder ?? (label && label.toLowerCase() !== meta.label.toLowerCase() ? label : meta.label)}
         <Icons.chevronDown size={13} />
       </button>
       {open && (
-        <ul className="status-menu card" role="listbox" aria-label="Status">
-          {(Object.keys(STATUS_META) as TicketStatus[]).map((s) => (
-            <li key={s} role="option" aria-selected={s === value}>
-              <button type="button" onClick={() => pick(s)}>
-                <span className={`badge ${STATUS_META[s].cls}`}>
-                  <span className={STATUS_META[s].dot} aria-hidden />
-                  {STATUS_META[s].label}
-                </span>
-                {s === value && <Icons.check size={14} />}
-              </button>
-            </li>
+        <div className={`status-menu card align-${align}`} role="listbox" aria-label="Status">
+          {groups.map((g) => (
+            <div key={g.category} className="menu-group">
+              {fromTool && <div className="menu-head">{CATEGORY_HEAD[g.category]}</div>}
+              {g.items.map((s) => (
+                <button key={s.name} type="button" role="option" aria-selected={current?.name === s.name} onClick={() => pick(s)}>
+                  <span className={`badge ${STATUS_META[s.category].cls}`}>
+                    <span className={STATUS_META[s.category].dot} aria-hidden />
+                    {s.name}
+                  </span>
+                  {current?.name === s.name && <Icons.check size={14} />}
+                </button>
+              ))}
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
+  );
+}
+
+const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low' };
+export const priorityLabel = (p: Priority | null) => (p ? PRIORITY_LABEL[p] : 'No priority');
+
+/** Signal bars (1–3) or an exclamation for urgent: readable without color. */
+export function PriorityIcon({ priority, size = 14 }: { priority: Priority | null; size?: number }) {
+  if (priority === 'urgent')
+    return (
+      <svg className="prio-icon prio-urgent" width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+        <rect x="1" y="1" width="14" height="14" rx="4" fill="currentColor" />
+        <path d="M8 4.5v4.2M8 11.2v.3" stroke="var(--surface)" strokeWidth="1.9" strokeLinecap="round" />
+      </svg>
+    );
+  const level = priority === 'high' ? 3 : priority === 'medium' ? 2 : priority === 'low' ? 1 : 0;
+  return (
+    <svg className={`prio-icon prio-${priority ?? 'none'}`} width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <rect key={i} x={2 + i * 4.6} y={10 - i * 3.5} width="3" height={4.5 + i * 3.5} rx="1" fill="currentColor" opacity={i < level ? 1 : 0.22} />
+      ))}
+    </svg>
+  );
+}
+
+export function PriorityPicker({
+  value,
+  onChange,
+  disabled,
+  align = 'right',
+  placeholder,
+}: {
+  value: Priority | null;
+  onChange: (p: Priority | null) => void | Promise<void>;
+  disabled?: boolean;
+  align?: 'left' | 'right';
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const pick = async (p: Priority | null) => {
+    setOpen(false);
+    if (p === value && !placeholder) return;
+    setBusy(true);
+    try {
+      await onChange(p);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="status-picker" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="status-trigger badge prio-trigger" aria-haspopup="listbox" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}>
+        {!placeholder && <PriorityIcon priority={value} />}
+        {busy ? 'Saving…' : placeholder ?? priorityLabel(value)}
+        <Icons.chevronDown size={13} />
+      </button>
+      {open && (
+        <div className={`status-menu card align-${align}`} role="listbox" aria-label="Priority">
+          {[...PRIORITIES, null].map((p) => (
+            <button key={p ?? 'none'} type="button" role="option" aria-selected={!placeholder && p === value} onClick={() => pick(p)}>
+              <span className="row" style={{ gap: 8 }}>
+                <PriorityIcon priority={p} /> {priorityLabel(p)}
+              </span>
+              {!placeholder && p === value && <Icons.check size={14} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Avatar({ name, size = 22 }: { name: string; size?: number }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join('');
+  return (
+    <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.42 }} title={name} aria-hidden>
+      {initials || '?'}
+    </span>
   );
 }
 
