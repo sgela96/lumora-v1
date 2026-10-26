@@ -50,13 +50,16 @@ export async function syncTicket(ticketId: string): Promise<TicketRow | undefine
   const primary = deliveries.find((d) => d.external && !d.external.error) ?? deliveries.find((d) => d.external);
   const status: TicketStatus = (primary?.external?.status as TicketStatus) ?? (ticket.status as TicketStatus);
   const resolvedAt = status === 'resolved' ? ticket.resolved_at ?? now : null;
+  const assignee = primary?.external && 'assignee' in primary.external ? primary.external.assignee : undefined;
   run(
-    'UPDATE tickets SET deliveries = ?, status = ?, external_status = ?, synced_at = ?, resolved_at = ? WHERE id = ?',
+    'UPDATE tickets SET deliveries = ?, status = ?, external_status = ?, synced_at = ?, resolved_at = ?, assignee_name = ?, assignee_email = ? WHERE id = ?',
     JSON.stringify(deliveries),
     status,
     primary?.external?.label ?? null,
     now,
     resolvedAt,
+    assignee === undefined ? ticket.assignee_name : assignee?.name ?? null,
+    assignee === undefined ? ticket.assignee_email : assignee?.email ?? null,
     ticket.id,
   );
   return one<TicketRow>('SELECT * FROM tickets WHERE id = ?', ticket.id);

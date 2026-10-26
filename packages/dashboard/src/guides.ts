@@ -43,7 +43,15 @@ export const SETUP_GUIDES: Record<string, string[]> = {
   ],
   servicenow: ['Use your instance name (yourcompany in yourcompany.service-now.com).', 'Create an integration user with the itil role, then use its username and password.'],
   freshservice: ['Your domain is yourcompany.freshservice.com.', 'Copy your API key from Profile settings.'],
-  slack: ['In Slack, create an app → Incoming Webhooks → turn on → “Add New Webhook to Workspace”.', 'Pick the channel and copy the webhook URL.'],
+  slack: [
+    'In Slack, create an app → Incoming Webhooks → turn on → “Add New Webhook to Workspace”.',
+    'Pick the channel and copy the webhook URL.',
+    'For reminders by direct message (Business): OAuth & Permissions → add the scopes chat:write, users:read and users:read.email → reinstall → copy the Bot User OAuth Token (xoxb-…).',
+  ],
+  teams: [
+    'In Teams, open the channel → ••• → Workflows → “Post to a channel when a webhook request is received”.',
+    'Name it Lumora, pick the team and channel, then copy the URL it gives you.',
+  ],
   webhook: ['Any HTTPS endpoint that accepts JSON works: your backend, Zapier, Make or n8n.', 'Set a signing secret to verify requests with the X-Lumora-Signature header.'],
   email: ['Write the inbox that should receive reports, like support@yourcompany.com.', 'Many help desks turn e-mails into tickets automatically.'],
 };

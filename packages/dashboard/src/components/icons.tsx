@@ -187,6 +187,7 @@ const BRAND: Record<string, [string, string]> = {
   freshservice: ['Fs', '#0DB4BE'],
   webhook: ['{ }', '#636366'],
   slack: ['Sl', '#4A154B'],
+  teams: ['Te', '#5B5FC7'],
   email: ['@', '#8E8E93'],
 };
 

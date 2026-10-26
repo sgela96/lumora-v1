@@ -91,7 +91,7 @@ test('jira: creates an issue, uploads attachments, normalizes status categories'
 
   for (const [key, expected] of [['new', 'open'], ['indeterminate', 'in_progress'], ['done', 'resolved']] as const) {
     stubFetch([[/\/issue\/SUP-12\?fields=status/, { fields: { status: { name: 'Whatever', statusCategory: { key } } } }]]);
-    assert.deepEqual(await CONNECTORS.jira.fetchStatus!(cfg, 'SUP-12'), { status: expected, label: 'Whatever' });
+    assert.deepEqual(await CONNECTORS.jira.fetchStatus!(cfg, 'SUP-12'), { status: expected, label: 'Whatever', assignee: null });
   }
 });
 
@@ -103,9 +103,9 @@ test('github: returns the issue number as id and maps open/closed', async () => 
   assert.match((calls[0].body as any).body, /!\[Screenshot\]\(https:\/\/lumora\.test/);
 
   stubFetch([[/\/issues\/42$/, { state: 'closed', state_reason: 'completed' }]]);
-  assert.deepEqual(await CONNECTORS.github.fetchStatus!(cfg, '42'), { status: 'resolved', label: 'Closed' });
+  assert.deepEqual(await CONNECTORS.github.fetchStatus!(cfg, '42'), { status: 'resolved', label: 'Closed', assignee: null });
   stubFetch([[/\/issues\/42$/, { state: 'open' }]]);
-  assert.deepEqual(await CONNECTORS.github.fetchStatus!(cfg, '#42'), { status: 'open', label: 'Open' });
+  assert.deepEqual(await CONNECTORS.github.fetchStatus!(cfg, '#42'), { status: 'open', label: 'Open', assignee: null });
 });
 
 test('azure devops: uploads, then creates a Bug with repro steps and the attachment relation', async () => {
@@ -163,18 +163,18 @@ test('gitlab: uploads files, embeds them, and maps opened/closed', async () => {
   assert.match((calls[1].body as any).description, /!\[shot\]\(\/uploads\/abc\/shot\.png\)/);
 
   stubFetch([[/\/issues\/9$/, { state: 'closed' }]]);
-  assert.deepEqual(await CONNECTORS.gitlab.fetchStatus!(cfg, '9'), { status: 'resolved', label: 'Closed' });
+  assert.deepEqual(await CONNECTORS.gitlab.fetchStatus!(cfg, '9'), { status: 'resolved', label: 'Closed', assignee: null });
   stubFetch([[/\/issues\/9$/, { state: 'opened' }]]);
-  assert.deepEqual(await CONNECTORS.gitlab.fetchStatus!(cfg, '#9'), { status: 'open', label: 'Open' });
+  assert.deepEqual(await CONNECTORS.gitlab.fetchStatus!(cfg, '#9'), { status: 'open', label: 'Open', assignee: null });
 });
 
 test('help desk status mapping (zendesk, freshdesk, linear, clickup)', async () => {
   stubFetch([[/tickets\/5\.json$/, { ticket: { status: 'pending' } }]]);
-  assert.deepEqual(await CONNECTORS.zendesk.fetchStatus!({ subdomain: 'acme', email: 'a@b.c', apiToken: 't' }, '5'), { status: 'in_progress', label: 'Pending' });
+  assert.deepEqual(await CONNECTORS.zendesk.fetchStatus!({ subdomain: 'acme', email: 'a@b.c', apiToken: 't' }, '5'), { status: 'in_progress', label: 'Pending', assignee: null });
   stubFetch([[/tickets\/5$/, { status: 4 }]]);
   assert.deepEqual(await CONNECTORS.freshdesk.fetchStatus!({ domain: 'acme.freshdesk.com', apiKey: 'k' }, '5'), { status: 'resolved', label: 'Resolved' });
   stubFetch([[/linear\.app\/graphql/, { data: { issue: { state: { name: 'In Review', type: 'started' } } } }]]);
-  assert.deepEqual(await CONNECTORS.linear.fetchStatus!({ apiKey: 'k', teamKey: 'ENG' }, 'ENG-1'), { status: 'in_progress', label: 'In Review' });
+  assert.deepEqual(await CONNECTORS.linear.fetchStatus!({ apiKey: 'k', teamKey: 'ENG' }, 'ENG-1'), { status: 'in_progress', label: 'In Review', assignee: null });
   stubFetch([[/task\/abc$/, { status: { status: 'qa', type: 'custom' } }]]);
   assert.deepEqual(await CONNECTORS.clickup.fetchStatus!({ token: 't', listId: '1' }, 'abc'), { status: 'in_progress', label: 'qa' });
 });

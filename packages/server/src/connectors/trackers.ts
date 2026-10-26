@@ -168,10 +168,25 @@ export const gitlab: Connector = {
   async fetchStatus(cfg, iid) {
     required(cfg, 'project', 'token');
     const { api, project } = gitlabProject(cfg);
-    const issue = await request<{ state: string }>(`${api}/projects/${project}/issues/${encodeURIComponent(iid.replace(/^#/, ''))}`, {
+    const issue = await request<{ state: string; assignee?: { name: string } | null }>(`${api}/projects/${project}/issues/${encodeURIComponent(iid.replace(/^#/, ''))}`, {
       headers: { 'PRIVATE-TOKEN': cfg.token },
     });
-    return issue.state === 'closed' ? { status: 'resolved', label: 'Closed' } : { status: 'open', label: 'Open' };
+    const assignee = issue.assignee ? { name: issue.assignee.name } : null;
+    return issue.state === 'closed' ? { status: 'resolved', label: 'Closed', assignee } : { status: 'open', label: 'Open', assignee };
+  },
+  async listStatuses() {
+    return [
+      { name: 'Open', category: 'open' },
+      { name: 'Closed', category: 'resolved' },
+    ];
+  },
+  async setStatus(cfg, iid, target) {
+    required(cfg, 'project', 'token');
+    const { api, project } = gitlabProject(cfg);
+    await request(`${api}/projects/${project}/issues/${encodeURIComponent(iid.replace(/^#/, ''))}?state_event=${target.category === 'resolved' ? 'close' : 'reopen'}`, {
+      method: 'PUT',
+      headers: { 'PRIVATE-TOKEN': cfg.token },
+    });
   },
 };
 

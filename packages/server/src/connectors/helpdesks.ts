@@ -1,6 +1,6 @@
 import { toHtml, toJiraWiki, toPlain } from '../lib/markdown';
 import { basicAuth, ConnectorError, fileBlob, normalizeBaseUrl, request, required } from './http';
-import type { Connector, ExternalStatus } from './types';
+import type { Connector, ExternalStatus, RemoteStatus } from './types';
 
 // ---------------------------------------------------------------- Jira Cloud
 
@@ -84,12 +84,34 @@ export const jira: Connector = {
   async fetchStatus(cfg, key) {
     required(cfg, 'siteUrl', 'email', 'apiToken');
     const base = normalizeBaseUrl(cfg.siteUrl);
-    const issue = await request<{ fields: { status: { name: string; statusCategory?: { key: string } } } }>(
-      `${base}/rest/api/2/issue/${encodeURIComponent(key)}?fields=status`,
+    const issue = await request<{ fields: { status: { name: string; statusCategory?: { key: string } }; assignee?: { displayName: string; emailAddress?: string } | null } }>(
+      `${base}/rest/api/2/issue/${encodeURIComponent(key)}?fields=status,assignee`,
       { headers: { Authorization: basicAuth(cfg.email, cfg.apiToken), Accept: 'application/json' } },
     );
-    const category = issue.fields.status.statusCategory?.key;
-    return { status: category === 'done' ? 'resolved' : category === 'indeterminate' ? 'in_progress' : 'open', label: issue.fields.status.name };
+    const a = issue.fields.assignee;
+    return { status: jiraCategory(issue.fields.status.statusCategory?.key), label: issue.fields.status.name, assignee: a ? { name: a.displayName, email: a.emailAddress } : null };
+  },
+  // Jira groups every status in To Do / In Progress / Done, so four "In Progress"-like statuses still map cleanly.
+  async listStatuses(cfg) {
+    required(cfg, 'siteUrl', 'email', 'apiToken', 'projectKey');
+    const types = await request<{ name: string; statuses: { name: string; statusCategory?: { key: string } }[] }[]>(
+      `${normalizeBaseUrl(cfg.siteUrl)}/rest/api/2/project/${encodeURIComponent(cfg.projectKey)}/statuses`,
+      { headers: { Authorization: basicAuth(cfg.email, cfg.apiToken), Accept: 'application/json' } },
+    );
+    const wanted = types.find((t) => t.name.toLowerCase() === (cfg.issueType || 'bug').toLowerCase()) ?? types[0];
+    const seen = new Set<string>();
+    return (wanted?.statuses ?? [])
+      .filter((s) => !seen.has(s.name) && seen.add(s.name))
+      .map((s) => ({ name: s.name, category: jiraCategory(s.statusCategory?.key) }));
+  },
+  async setStatus(cfg, key, target) {
+    required(cfg, 'siteUrl', 'email', 'apiToken');
+    const url = `${normalizeBaseUrl(cfg.siteUrl)}/rest/api/2/issue/${encodeURIComponent(key)}/transitions`;
+    const auth = { Authorization: basicAuth(cfg.email, cfg.apiToken), Accept: 'application/json' };
+    const { transitions } = await request<{ transitions: { id: string; to: { name: string } }[] }>(url, { headers: auth });
+    const move = transitions.find((t) => t.to.name.toLowerCase() === target.name.toLowerCase());
+    if (!move) throw new ConnectorError(`Jira’s workflow doesn’t allow moving this issue to “${target.name}” from its current status`);
+    await request(url, { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ transition: { id: move.id } }) });
   },
 };
 
@@ -153,13 +175,37 @@ export const zendesk: Connector = {
   },
   async fetchStatus(cfg, id) {
     required(cfg, 'subdomain', 'email', 'apiToken');
-    const res = await request<{ ticket: { status: string } }>(`${zendeskBase(cfg.subdomain)}/api/v2/tickets/${encodeURIComponent(id)}.json`, {
-      headers: { Authorization: basicAuth(`${cfg.email}/token`, cfg.apiToken) },
+    const auth = { Authorization: basicAuth(`${cfg.email}/token`, cfg.apiToken) };
+    const res = await request<{ ticket: { status: string; assignee_id: number | null } }>(`${zendeskBase(cfg.subdomain)}/api/v2/tickets/${encodeURIComponent(id)}.json`, { headers: auth });
+    let assignee: ExternalStatus['assignee'] = null;
+    if (res.ticket.assignee_id) {
+      const user = await request<{ user: { name: string; email?: string } }>(`${zendeskBase(cfg.subdomain)}/api/v2/users/${res.ticket.assignee_id}.json`, { headers: auth }).catch(() => null);
+      if (user) assignee = { name: user.user.name, email: user.user.email };
+    }
+    return { status: zendeskCategory(res.ticket.status), label: capitalize(res.ticket.status), assignee };
+  },
+  async listStatuses() {
+    return ZENDESK_STATUSES.map((s) => ({ name: capitalize(s), category: zendeskCategory(s) }));
+  },
+  async setStatus(cfg, id, target) {
+    required(cfg, 'subdomain', 'email', 'apiToken');
+    await request(`${zendeskBase(cfg.subdomain)}/api/v2/tickets/${encodeURIComponent(id)}.json`, {
+      method: 'PUT',
+      headers: { Authorization: basicAuth(`${cfg.email}/token`, cfg.apiToken), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket: { status: target.name.toLowerCase() } }),
     });
-    const status = res.ticket.status;
-    return { status: ['solved', 'closed'].includes(status) ? 'resolved' : ['pending', 'hold'].includes(status) ? 'in_progress' : 'open', label: capitalize(status) };
   },
 };
+
+const ZENDESK_STATUSES = ['new', 'open', 'pending', 'hold', 'solved'];
+
+function zendeskCategory(status: string): RemoteStatus['category'] {
+  return ['solved', 'closed'].includes(status) ? 'resolved' : ['pending', 'hold'].includes(status) ? 'in_progress' : 'open';
+}
+
+function jiraCategory(key: string | undefined): RemoteStatus['category'] {
+  return key === 'done' ? 'resolved' : key === 'indeterminate' ? 'in_progress' : 'open';
+}
 
 function zendeskBase(subdomain: string): string {
   return `https://${subdomain.replace(/\.zendesk\.com.*$/, '').replace(/^https?:\/\//, '')}.zendesk.com`;
@@ -287,11 +333,28 @@ export const github: Connector = {
   },
   async fetchStatus(cfg, id) {
     required(cfg, 'repository', 'token');
-    const issue = await request<{ state: string; state_reason?: string | null }>(
+    const issue = await request<{ state: string; state_reason?: string | null; assignee?: { login: string } | null }>(
       `https://api.github.com/repos/${repoPath(cfg.repository)}/issues/${encodeURIComponent(id.replace(/^#/, ''))}`,
       { headers: githubHeaders(cfg.token) },
     );
-    return issue.state === 'closed' ? { status: 'resolved', label: issue.state_reason === 'not_planned' ? 'Closed (not planned)' : 'Closed' } : { status: 'open', label: 'Open' };
+    const assignee = issue.assignee ? { name: issue.assignee.login } : null;
+    return issue.state === 'closed'
+      ? { status: 'resolved', label: issue.state_reason === 'not_planned' ? 'Closed (not planned)' : 'Closed', assignee }
+      : { status: 'open', label: 'Open', assignee };
+  },
+  async listStatuses() {
+    return [
+      { name: 'Open', category: 'open' },
+      { name: 'Closed', category: 'resolved' },
+    ];
+  },
+  async setStatus(cfg, id, target) {
+    required(cfg, 'repository', 'token');
+    await request(`https://api.github.com/repos/${repoPath(cfg.repository)}/issues/${encodeURIComponent(id.replace(/^#/, ''))}`, {
+      method: 'PATCH',
+      headers: githubHeaders(cfg.token),
+      body: JSON.stringify({ state: target.category === 'resolved' ? 'closed' : 'open' }),
+    });
   },
 };
 
@@ -345,15 +408,38 @@ export const linear: Connector = {
   },
   async fetchStatus(cfg, identifier) {
     required(cfg, 'apiKey');
-    const data = await linearQuery<{ issue: { state: { name: string; type: string } } }>(
+    const data = await linearQuery<{ issue: { state: { name: string; type: string }; assignee: { name: string; email: string } | null } }>(
       cfg,
-      `query($id: String!) { issue(id: $id) { state { name type } } }`,
+      `query($id: String!) { issue(id: $id) { state { name type } assignee { name email } } }`,
       { id: identifier },
     );
-    const type = data.issue.state.type;
-    return { status: type === 'completed' || type === 'canceled' ? 'resolved' : type === 'started' ? 'in_progress' : 'open', label: data.issue.state.name };
+    const a = data.issue.assignee;
+    return { status: linearCategory(data.issue.state.type), label: data.issue.state.name, assignee: a ? { name: a.name, email: a.email } : null };
+  },
+  async listStatuses(cfg) {
+    return (await linearStates(cfg)).map((s) => ({ name: s.name, category: linearCategory(s.type) }));
+  },
+  async setStatus(cfg, identifier, target) {
+    const state = (await linearStates(cfg)).find((s) => s.name.toLowerCase() === target.name.toLowerCase());
+    if (!state) throw new ConnectorError(`Linear has no state called “${target.name}” in team ${cfg.teamKey}`);
+    await linearQuery(cfg, `mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }`, { id: identifier, stateId: state.id });
   },
 };
+
+function linearCategory(type: string): 'open' | 'in_progress' | 'resolved' {
+  return type === 'completed' || type === 'canceled' ? 'resolved' : type === 'started' ? 'in_progress' : 'open';
+}
+
+async function linearStates(cfg: Record<string, string>): Promise<{ id: string; name: string; type: string; position: number }[]> {
+  required(cfg, 'apiKey', 'teamKey');
+  const teamId = await linearTeamId(cfg);
+  const data = await linearQuery<{ team: { states: { nodes: { id: string; name: string; type: string; position: number }[] } } }>(
+    cfg,
+    `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`,
+    { id: teamId },
+  );
+  return data.team.states.nodes.sort((a, b) => a.position - b.position);
+}
 
 async function linearQuery<T>(cfg: Record<string, string>, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const res = await request<{ data?: T; errors?: { message: string }[] }>('https://api.linear.app/graphql', {

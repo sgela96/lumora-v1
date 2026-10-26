@@ -270,7 +270,7 @@ export interface Delivery {
   error?: string;
   at: string;
   /** Last status read from the linked ticket (Support Center). */
-  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string };
+  external?: { status: TicketStatus; label: string; syncedAt: string; error?: string; assignee?: { name: string; email?: string } | null };
 }
 
 export function uploadsDir(): string {
@@ -368,7 +368,7 @@ export async function createTicket(
         const finalSteps = ai?.steps.length ? ai.steps : steps;
         const improved = renderTicket({ settings, payload, steps: finalSteps, stepsAreRelative: ai?.steps.length ? false : relative, attachments, ai, transcript, reference });
         run(
-          'UPDATE tickets SET title = ?, description = ?, steps = ?, ai_summary = ?, ai_data = ?, transcript = ?, category = COALESCE(category, ?) WHERE id = ?',
+          'UPDATE tickets SET title = ?, description = ?, steps = ?, ai_summary = ?, ai_data = ?, transcript = ?, category = COALESCE(category, ?), priority = COALESCE(priority, ?) WHERE id = ?',
           improved.title,
           improved.description,
           JSON.stringify(finalSteps),
@@ -376,6 +376,7 @@ export async function createTicket(
           ai ? JSON.stringify(ai) : null,
           transcript ? JSON.stringify(transcript) : null,
           ai?.category ?? null,
+          ai?.priority ?? null,
           ticketId,
         );
       }
@@ -403,6 +404,9 @@ function sanitizePayload(payload: ReportPayload, settings: ProjectSettings): voi
   const allowed = new Set(settings.template.fields.map((f) => f.id));
   for (const key of Object.keys(payload.fields)) if (!allowed.has(key)) delete payload.fields[key];
 }
+
+export type Priority = 'low' | 'medium' | 'high' | 'urgent';
+export const PRIORITIES: Priority[] = ['urgent', 'high', 'medium', 'low'];
 
 export interface TicketRow {
   id: string;
@@ -434,6 +438,10 @@ export interface TicketRow {
   error_count: number;
   synced_at: string | null;
   resolved_at: string | null;
+  /** low | medium | high | urgent — suggested by AI Powered or set by the team. */
+  priority: string | null;
+  assignee_name: string | null;
+  assignee_email: string | null;
   created_at: string;
 }
 
@@ -526,6 +534,8 @@ export function serializeTicket(row: TicketRow, full = false) {
     browser: row.browser,
     os: row.os,
     errorCount: row.error_count,
+    priority: row.priority as Priority | null,
+    assignee: row.assignee_name ? { name: row.assignee_name, email: row.assignee_email } : null,
     deliveries: JSON.parse(row.deliveries) as Delivery[],
     hasScreenshot: !!row.screenshot_file,
     hasRecording: !!row.recording_file,
