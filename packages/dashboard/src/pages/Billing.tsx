@@ -35,7 +35,7 @@ const COMPARE: { group: string; rows: [string, string, string, string][] }[] = [
       ['Screenshots with markup', '✓', '✓', '✓'],
       ['Screen recording with voice', '—', '2 min (10 with extra)', '10 min'],
       ['Written steps from recordings', '—', '✓', '✓'],
-      ['Your branding (no “Powered by”)', '—', '✓', '✓'],
+      ['White label (no “Powered by Lumora”)', '—', '—', '✓'],
     ],
   },
   {

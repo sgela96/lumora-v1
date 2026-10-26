@@ -54,7 +54,8 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 | Grabación con voz → pasos escritos | — | 2 min | 10 min |
 | Red y últimas acciones del usuario | — | ✓ | ✓ |
 | Destinos | 1 destino: Jira, GitHub, Linear, Slack, webhook o e-mail | + los 10 trackers (Jira, Azure DevOps, GitHub…) | + help desks + Salesforce, ServiceNow, Freshservice |
-| Template propio, sin marca | — | ✓ | ✓ |
+| Template propio | — | ✓ | ✓ |
+| Sin "Powered by Lumora" (marca blanca) | — | — | ✓ |
 | Dashboard | — | Básica | Avanzada |
 | Repositorio con estado sincronizado, issues agrupados | — | — | ✓ |
 | AI Powered | — | Extra | ✓ |

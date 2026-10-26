@@ -15,7 +15,7 @@
   --iris: linear-gradient(120deg, #ffe28a 0%, #ffc7a6 30%, #e3c6ff 62%, #b9dcff 100%);
   --iris-conic: conic-gradient(from 180deg, #ffe28a, #ffc7a6, #e3c6ff, #b9dcff, #ffe28a);
   /* Deeper iris for text on light surfaces (pastels alone don't read on white). */
-  --iris-ink: linear-gradient(110deg, #c48a00 0%, #b278d8 60%, #8f5ad6 100%);
+  --iris-ink: linear-gradient(110deg, #c98a00 0%, #e0704f 45%, #9b62e0 100%);
   --glow-1: rgba(255, 214, 102, .55);
   --glow-2: rgba(255, 186, 150, .35);
   --glow-3: rgba(200, 170, 255, .30);
@@ -602,8 +602,8 @@ button.nav-link { width: 100%; border: 0; background: none; font: inherit; text-
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 18px; }
 .brand-row .brand { padding-bottom: 0; }
 .plan-chip { display: inline-grid; place-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .01em; line-height: 1; }
-.plan-chip.plan-pro { background: var(--iris); color: #3a2a00; box-shadow: 0 0 14px -2px var(--glow-1); }
-.plan-chip.plan-business { background: #1d1d1f; color: #ffd666; box-shadow: 0 0 0 1px rgba(255, 214, 102, .45), 0 0 16px -2px var(--glow-1); }
+.plan-chip { color: #fff; background: var(--iris-ink); text-shadow: 0 1px 1px rgba(0, 0, 0, .15); box-shadow: 0 0 16px -4px var(--glow-2); }
+:root[data-theme="dark"] .plan-chip { color: #2a1d00; text-shadow: none; }
 .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
 .icon-btn:hover { background: var(--fill); color: var(--text); }
 .icon-btn svg { display: block; }

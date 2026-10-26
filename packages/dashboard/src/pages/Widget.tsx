@@ -103,7 +103,7 @@ export function WidgetPage({ project }: { project: Project }) {
               checked={a.showBranding || !me.limits.features.removeBranding}
               onChange={(v) => update((s) => void (s.appearance.showBranding = v))}
               lockedTo={lock('removeBranding')} tier={tier('removeBranding')}
-              description={lock('removeBranding') ? 'Remove the footer link on a higher plan.' : undefined}
+              description={lock('removeBranding') ? 'Business can remove the footer link.' : undefined}
             />
           </Card>
 
