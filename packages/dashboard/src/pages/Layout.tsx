@@ -3,7 +3,7 @@ import { api, ApiError } from '../api';
 import { HelpPanel } from '../components/Help';
 import { Icons } from '../components/icons';
 import { Tour, tourSteps } from '../components/Tour';
-import { WelcomeModal } from '../components/WelcomeModal';
+import { Showcase } from '../components/Showcase';
 import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
 import { TrialButton } from '../components/TrialButton';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -224,8 +224,9 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
       {helpOpen && <HelpPanel me={me} project={project} onClose={() => setHelpOpen(false)} onTour={startTour} />}
       {touring && <Tour steps={tourSteps(me)} onDone={endTour} />}
       {celebrate && !touring && (
-        <WelcomeModal
+        <Showcase
           me={me}
+          projectId={project?.id}
           onClose={() => void saveOnboarding({ seenPlan: true })}
           onTour={() => {
             void saveOnboarding({ seenPlan: true });
