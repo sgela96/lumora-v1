@@ -4,6 +4,7 @@ import {
   nebulaSvg,
   redactText,
   redactUrl,
+  type LauncherMode,
   type Locale,
   type ReportKind,
   type ReportPayload,
@@ -19,6 +20,7 @@ import type { ConsoleCapture } from '../capture/console';
 import { captureEnvironment } from '../capture/environment';
 import type { NetworkCapture } from '../capture/network';
 import { isRecordingSupported, ScreenRecorder } from '../capture/recorder';
+import type { ErrorSignal, ErrorSignals } from '../capture/signals';
 import { canvasToBlob, captureDisplay, captureDom } from '../capture/screenshot';
 import { el, formatDuration } from '../util';
 import { annotate } from './annotator';
@@ -46,6 +48,7 @@ export interface WidgetDeps {
   api: LumoraApi;
   console: ConsoleCapture;
   network: NetworkCapture;
+  signals: ErrorSignals;
   actions: ActionCapture;
   host: HTMLElement;
   getReporter: () => ReporterInfo;
@@ -80,11 +83,17 @@ export class Widget {
   /** "Include my voice" — on by default when the site allows the microphone. */
   private micOn = true;
   private stopActionListener?: () => void;
-  private proactiveShown = false;
   private moodTimer?: number;
+  private mode: LauncherMode;
+  /** Set by Lumora('show') / Lumora('hide'); overrides the launcher mode. */
+  private forced?: boolean;
+  private retreatTimer?: number;
+  private lastNudge = 0;
+  private lastSignal = { text: '', at: 0 };
 
   constructor(private deps: WidgetDeps) {
     const s = deps.config.settings;
+    this.mode = s.smart.launcher;
     this.locale = resolveLocale(s.appearance.locale);
     this.t = STRINGS[this.locale];
     this.shadow = deps.host.attachShadow({ mode: 'open' });
@@ -98,11 +107,8 @@ export class Widget {
     this.build();
     this.resetForm();
 
-    deps.console.onEntry((entry) => {
-      if (entry.level !== 'error') return;
-      deps.actions.recordError(entry.message);
-      this.onPageError();
-    });
+    deps.console.onEntry((entry) => entry.level === 'error' && deps.actions.recordError(entry.message));
+    deps.signals.onSignal((signal) => this.onSignal(signal));
   }
 
   // ---------- Public controls ----------
@@ -114,6 +120,8 @@ export class Widget {
     const types = this.deps.config.settings.reportTypes;
     const onlyDescribe = !types.screenshot && !types.recording;
     this.setView(onlyDescribe || kind === 'describe' || this.hasDraft() ? 'form' : 'home');
+    window.clearTimeout(this.retreatTimer);
+    if (this.launcher.hidden) this.arrive();
     if (this.panel.hidden || this.closing) {
       // The nebula expands and the panel emerges from it.
       this.closing = false;
@@ -137,6 +145,8 @@ export class Widget {
       this.closing = false;
       this.panel.hidden = true;
       if (this.view === 'done' || this.view === 'error') this.resetForm();
+      // Hidden-until-needed: once the panel is closed the nebula goes back into hiding.
+      this.scheduleRetreat(finished ? 1200 : 300);
     });
     this.play(this.orb(), finished ? 'lu-absorb' : 'lu-contract');
     if (finished) this.burst(this.launcher, 6, 38);
@@ -150,7 +160,10 @@ export class Widget {
   }
 
   setLauncherVisible(visible: boolean): void {
-    this.launcher.hidden = !visible;
+    this.forced = visible;
+    window.clearTimeout(this.retreatTimer);
+    if (visible && this.launcher.hidden) this.arrive();
+    if (!visible) this.hideAll();
   }
 
   destroy(): void {
@@ -187,6 +200,8 @@ export class Widget {
     this.launcher.style[vertical] = oy;
     this.launcher.style[horizontal] = ox;
     this.launcher.addEventListener('click', () => this.toggle());
+    // Hidden until needed (or until the app opens it): no launcher on the page by default.
+    if (this.mode !== 'always') this.launcher.hidden = true;
 
     this.panel = el('div', { class: 'lu-panel', role: 'dialog', 'aria-label': this.t.launcher, hidden: true });
     this.panel.style[vertical] = `calc(${oy} + 76px)`;
@@ -544,6 +559,7 @@ export class Widget {
     this.stopActionListener?.();
     this.recbar.hidden = true;
     this.showLauncher();
+    this.scheduleRetreat(300);
   }
 
   private showRecbar(): void {
@@ -670,25 +686,71 @@ export class Widget {
 
   // ---------- Proactive help ----------
 
-  private onPageError(): void {
-    if (!this.deps.config.settings.appearance.proactiveOnError) return;
-    if (!this.panel.hidden || this.recorder || this.launcher.hidden) return;
+  private onSignal(signal: ErrorSignal): void {
+    const now = Date.now();
+    if (signal.message === this.lastSignal.text && now - this.lastSignal.at < 10_000) return;
+    this.lastSignal = { text: signal.message, at: now };
+    // What the user saw travels with the report, in the console and in the steps.
+    if (signal.source === 'message') {
+      const where = signal.platform === 'salesforce' ? ' (Salesforce)' : '';
+      this.deps.console.note({ level: 'error', message: `Error shown on screen${where}: “${signal.message}”`, timestamp: now });
+      this.deps.actions.recordError(`Saw “${signal.message}”`);
+    } else if (signal.source === 'network') this.deps.actions.recordError(signal.message);
+
+    const { appearance } = this.deps.config.settings;
+    if (this.mode === 'manual' || this.forced === false) return;
+    if (this.mode === 'always' && (!appearance.proactiveOnError || this.launcher.hidden)) return;
+    if (!this.panel.hidden || this.recorder || this.root.querySelector('.lu-annotator')) return;
+
+    if (this.launcher.hidden) this.arrive();
     this.launcher.setAttribute('data-mood', 'alert');
     window.clearTimeout(this.moodTimer);
     this.moodTimer = window.setTimeout(() => this.launcher.setAttribute('data-mood', 'calm'), 20000);
-    if (this.proactiveShown) return;
-    this.proactiveShown = true;
+    if (this.mode === 'onError') this.scheduleRetreat(45_000);
+    if (!appearance.proactiveOnError || now - this.lastNudge < 120_000) return;
+    this.lastNudge = now;
+
     const report = el('button', { class: 'lu-btn lu-btn-small', type: 'button', text: this.t.proactiveCta });
     report.style.background = 'var(--lu-accent)';
     report.style.color = 'var(--lu-on-accent)';
     report.addEventListener('click', () => this.open());
     const dismiss = el('button', { class: 'lu-btn lu-btn-ghost lu-btn-small', type: 'button', text: this.t.dismiss });
-    dismiss.addEventListener('click', () => this.hideTooltip());
-    this.tooltip.replaceChildren(el('div', { text: this.t.proactive }), el('div', { class: 'lu-tooltip-actions' }, [report, dismiss]));
+    dismiss.addEventListener('click', () => {
+      this.hideTooltip();
+      this.scheduleRetreat(400);
+    });
+    // Messages people saw on screen are quoted; stack traces and URLs are not for them.
+    const quote = signal.source === 'message' ? el('div', { class: 'lu-tooltip-quote', text: `“${signal.message}”` }) : null;
+    this.tooltip.replaceChildren(el('div', { class: 'lu-tooltip-title', text: this.t.proactive }), ...(quote ? [quote] : []), el('div', { class: 'lu-tooltip-actions' }, [report, dismiss]));
     window.setTimeout(() => {
-      if (this.panel.hidden && !this.recorder) this.tooltip.hidden = false;
+      if (this.panel.hidden && !this.recorder && !this.launcher.hidden) this.tooltip.hidden = false;
     }, 600);
     window.setTimeout(() => this.hideTooltip(), 15000);
+  }
+
+  /** The nebula appears out of nothing: it blooms in its corner. */
+  private arrive(): void {
+    this.launcher.hidden = false;
+    this.play(this.launcher, 'lu-arrive');
+  }
+
+  /** Back into hiding, unless someone is using it or the mode keeps it on the page. */
+  private retreat(): void {
+    if (this.mode === 'always' || this.forced === true || this.launcher.hidden) return;
+    if (!this.panel.hidden || this.closing || this.recorder || this.root.querySelector('.lu-annotator')) return;
+    if (this.launcher.matches(':hover') || this.tooltip.matches(':hover')) return this.scheduleRetreat(4000);
+    this.tooltip.hidden = true;
+    this.play(this.launcher, 'lu-depart', () => {
+      if (!this.panel.hidden || this.recorder) return;
+      this.launcher.hidden = true;
+      this.launcher.setAttribute('data-mood', 'calm');
+    });
+  }
+
+  private scheduleRetreat(ms: number): void {
+    if (this.mode === 'always') return;
+    window.clearTimeout(this.retreatTimer);
+    this.retreatTimer = window.setTimeout(() => this.retreat(), ms);
   }
 
   private hideTooltip(): void {
@@ -704,7 +766,7 @@ export class Widget {
 
   /** Restarts a one-shot CSS animation class and removes it when done. */
   private play(node: HTMLElement, className: string, onEnd?: () => void): void {
-    node.classList.remove('lu-opening', 'lu-closing', 'lu-expand', 'lu-contract', 'lu-absorb');
+    node.classList.remove('lu-opening', 'lu-closing', 'lu-expand', 'lu-contract', 'lu-absorb', 'lu-arrive', 'lu-depart');
     void node.offsetWidth;
     node.classList.add(className);
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

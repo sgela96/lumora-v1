@@ -388,6 +388,8 @@ function validateSettings(s: ProjectSettings): ProjectSettings {
   s.capture.network.maxEntries = clamp(s.capture.network.maxEntries, 1, 100);
   s.recording.maxSeconds = clamp(s.recording.maxSeconds, 10, 600);
   s.capture.redactSelectors = s.capture.redactSelectors.map((x) => String(x).slice(0, 200)).filter(Boolean).slice(0, 50);
+  if (!['always', 'onError', 'manual'].includes(s.smart.launcher)) throw new HttpError(400, `Unknown launcher mode ${s.smart.launcher}`);
+  s.smart.errorSelectors = s.smart.errorSelectors.map((x) => String(x).trim().slice(0, 200)).filter(Boolean).slice(0, 30);
   s.template.titleTemplate = s.template.titleTemplate.slice(0, 300);
   s.template.descriptionTemplate = s.template.descriptionTemplate.slice(0, 10_000);
   const ids = new Set<string>();

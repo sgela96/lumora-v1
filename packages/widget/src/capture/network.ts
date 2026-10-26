@@ -4,6 +4,7 @@ import { RingBuffer, truncate } from '../util';
 /** Records fetch / XHR calls (method, URL, status, timing). Bodies are never captured. */
 export class NetworkCapture {
   private buffer = new RingBuffer<NetworkEntry>(150);
+  private listeners = new Set<(entry: NetworkEntry) => void>();
 
   /** URLs starting with these prefixes are ignored (Lumora's own API). */
   constructor(private ignorePrefixes: string[]) {}
@@ -11,6 +12,11 @@ export class NetworkCapture {
   install(): void {
     this.patchFetch();
     this.patchXhr();
+  }
+
+  onEntry(listener: (entry: NetworkEntry) => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   entries(failedOnly: boolean, max: number): NetworkEntry[] {
@@ -23,7 +29,15 @@ export class NetworkCapture {
 
   private record(entry: NetworkEntry): void {
     if (this.ignored(entry.url)) return;
-    this.buffer.push({ ...entry, url: truncate(entry.url, 500) });
+    const stored = { ...entry, url: truncate(entry.url, 500) };
+    this.buffer.push(stored);
+    for (const listener of this.listeners) {
+      try {
+        listener(stored);
+      } catch {
+        // never break the host page's requests
+      }
+    }
   }
 
   private patchFetch(): void {

@@ -54,6 +54,11 @@ ${NEBULA_CSS}
 .lu-launcher:active { transform: scale(.96); }
 .lu-launcher:focus-visible { outline: 2px solid var(--lu-accent); outline-offset: 4px; }
 .lu-launcher[hidden] { display: none; }
+/* Hidden-until-needed: the nebula blooms into its corner, and folds away again. */
+.lu-launcher.lu-arrive { animation: lu-arrive .9s var(--lu-ease) both; }
+.lu-launcher.lu-depart { animation: lu-depart .6s var(--lu-ease) both; pointer-events: none; }
+@keyframes lu-arrive { 0% { opacity: 0; transform: scale(.2) rotate(-40deg); filter: blur(6px) brightness(1.4); } 60% { opacity: 1; transform: scale(1.12) rotate(6deg); filter: none; } 100% { opacity: 1; transform: scale(1); } }
+@keyframes lu-depart { 0% { opacity: 1; transform: scale(1); } 30% { transform: scale(1.08) rotate(6deg); } 100% { opacity: 0; transform: scale(.2) rotate(-40deg); filter: blur(6px); } }
 .lu-orb { position: absolute; inset: 0; transition: transform .7s var(--lu-ease), filter .7s var(--lu-ease); }
 .lu-launcher[data-open="true"] .lu-orb { transform: scale(1.14) rotate(25deg); filter: brightness(1.05) saturate(1.1); }
 .lu-orb.lu-expand { animation: lu-expand .75s var(--lu-ease); }
@@ -85,6 +90,8 @@ ${NEBULA_CSS}
   animation: lu-rise .45s var(--lu-ease);
 }
 .lu-tooltip-actions { display: flex; gap: 6px; margin-top: 10px; }
+.lu-tooltip-title { font-weight: 600; }
+.lu-tooltip-quote { margin-top: 6px; padding-left: 9px; border-left: 2px solid var(--lu-accent); color: var(--lu-muted, inherit); opacity: .85; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .lu-tooltip[hidden] { display: none; }
 
 /* ---------- Panel ---------- */

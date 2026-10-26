@@ -3,6 +3,8 @@ import { LumoraApi } from './api';
 import { ActionCapture } from './capture/actions';
 import { ConsoleCapture } from './capture/console';
 import { NetworkCapture } from './capture/network';
+import { salesforceContext } from './capture/salesforce';
+import { ErrorSignals } from './capture/signals';
 import { Widget } from './ui/widget';
 
 /**
@@ -14,9 +16,10 @@ import { Widget } from './ui/widget';
  *   Lumora('identify', { id: '42', email: 'ana@acme.com', name: 'Ana', plan: 'pro' });
  *   Lumora('metadata', { release: '2.3.1' });
  *   Lumora('open'); Lumora('screenshot'); Lumora('record'); Lumora('hide'); Lumora('show');
+ *   Lumora('error', 'Payment failed'); // tell Lumora something went wrong, so it can offer help
  */
 
-type Command = 'identify' | 'metadata' | 'open' | 'close' | 'screenshot' | 'record' | 'hide' | 'show' | 'destroy';
+type Command = 'identify' | 'metadata' | 'open' | 'close' | 'screenshot' | 'record' | 'hide' | 'show' | 'error' | 'destroy';
 type QueuedCall = [Command, ...unknown[]];
 type LumoraFn = ((command: Command, ...args: unknown[]) => void) & { q?: QueuedCall[]; loaded?: boolean; version?: string };
 
@@ -44,6 +47,7 @@ const VERSION = '0.1.0';
   let reporter: ReporterInfo = {};
   let metadata: Record<string, string | number | boolean> = {};
   let widget: Widget | undefined;
+  let signals: ErrorSignals | undefined;
   const pending: QueuedCall[] = [...(existing?.q ?? [])];
 
   const newHost = () => {
@@ -98,7 +102,11 @@ const VERSION = '0.1.0';
       case 'show':
         widget.setLauncherVisible(true);
         break;
+      case 'error':
+        signals?.report(String(args[0] ?? 'Something went wrong'));
+        break;
       case 'destroy':
+        signals?.stop();
         widget.destroy();
         widget = undefined;
         break;
@@ -123,24 +131,32 @@ const VERSION = '0.1.0';
       actions.options.redactSelectors = c.redactSelectors;
       const mount = (current = config) => {
         (document.body ?? document.documentElement).append(host);
+        signals?.stop();
+        const ownHost = host;
+        signals = new ErrorSignals({ settings: current.settings, console: consoleCapture, network, isOwnElement: (node) => node === ownHost || ownHost.contains(node) });
         widget = new Widget({
           config: current,
           api,
           console: consoleCapture,
           network,
+          signals,
           actions,
           host,
           getReporter: () => filterReporter(reporter, c.user),
-          getMetadata: () => metadata,
+          // On Salesforce, where the user was (object, record, page) comes along automatically.
+          getMetadata: () => ({ ...salesforceContext(), ...metadata }),
         });
+        signals.start();
         for (const call of pending.splice(0)) run(call);
       };
       // The back office's live preview (the demo page opened with ?preview=1) sends unsaved settings
       // so changes show before they are saved. Only the Lumora origin itself can do this.
       if (new URLSearchParams(location.search).get('preview') === '1') {
         window.addEventListener('message', (event) => {
-          const data = event.data as { type?: string; settings?: typeof config.settings; open?: boolean } | null;
-          if (event.origin !== new URL(apiBase).origin || data?.type !== 'lumora:preview' || !data.settings) return;
+          const data = event.data as { type?: string; settings?: typeof config.settings; open?: boolean; simulate?: 'error' } | null;
+          if (event.origin !== new URL(apiBase).origin || data?.type !== 'lumora:preview') return;
+          if (data.simulate === 'error') return signals?.simulate();
+          if (!data.settings) return;
           const wasOpen = !!host.shadowRoot?.querySelector('.lu-panel:not([hidden])');
           widget?.destroy();
           host = newHost();

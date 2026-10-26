@@ -110,7 +110,21 @@ docker build -t lumora . && docker run -p 3000:3000 -v lumora-data:/data -e LUMO
 </script>
 ```
 
-API: `Lumora('open' | 'screenshot' | 'record' | 'close' | 'hide' | 'show' | 'destroy')`.
+API: `Lumora('open' | 'screenshot' | 'record' | 'close' | 'hide' | 'show' | 'destroy')` y `Lumora('error', 'mensaje')` para avisar que algo salió mal.
+
+### Cuándo aparece la nebulosa (Settings → Widget)
+
+- **Always visible** (todos los planes): siempre en su esquina.
+- **When something goes wrong** (Pro y Business): oculta hasta que algo falla; entonces florece en la esquina, brilla y ofrece reportar (citando el mensaje que vio la persona). Si nadie la usa, vuelve a esconderse.
+- **Only from your app** (Pro y Business): sin nebulosa; la app la abre con `Lumora('open')`.
+
+Qué cuenta como "algo salió mal": errores de la página (todos los planes), requests que fallan con 5xx o sin red, mensajes de error en pantalla (toasts y alertas de las librerías comunes, Salesforce Lightning y Experience Cloud, incluidos los que viven en shadow DOM) y selectores propios del cliente (Pro y Business). Los mensajes de pantalla viajan en el reporte, en la consola y en los pasos.
+
+### Salesforce
+
+- **Experience Cloud**: el script va en *Settings → Advanced → Edit Head Markup* del Builder, con el dominio en Trusted Sites.
+- **Lightning Experience**: un LWC (`lumoraWidget`) que carga `lumora.js` desde un Static Resource y se agrega como Utility Item con *Start automatically*; identifica al usuario de Salesforce. Los pasos y el código están en *Settings → Install*.
+- En Salesforce, cada reporte trae objeto, record id y página (`salesforce.object`, `salesforce.recordId`, `salesforce.page`).
 
 ## Privacidad y seguridad
 
@@ -137,7 +151,8 @@ site/         web de marketing, servida en /
 
 ## Próximos pasos sugeridos
 
-- **AppExchange**: publicar un paquete gestionado de Salesforce con un componente LWC/Experience Cloud que cargue el widget y un flujo de OAuth en lugar de "Consumer key/secret", más la revisión de seguridad de Salesforce. El conector de Case ya está.
+- **AppExchange**: empaquetar el LWC de *Settings → Install* como paquete gestionado, con OAuth en lugar de "Consumer key/secret", y pasar la revisión de seguridad de Salesforce. El conector de Case ya está.
+- **Probar en un org real**: el LWC en Lightning Experience (con Lightning Web Security) y la detección de toasts de Lightning están verificados con las clases de SLDS en el demo, no en un org.
 - Probar cada conector contra una cuenta real (hoy están verificados con tests que simulan las APIs).
 - Support Center: asignar desde Lumora, notas internas, alertas cuando un issue crece, métricas entre todas las apps.
 - Más destinos: monday.com, Intercom, Notion, Azure Boards on-premise.
