@@ -139,3 +139,17 @@ test('add-ons extend Pro and are ignored on other plans', () => {
   assert.equal(effectiveLimits('free', { ai: 1 }).features.aiSteps, false);
   assert.equal(monthlyPrice('pro', { ai: 1, extra_app: 2 }), 49 + 29 + 30);
 });
+
+test('template pieces round-trip the default template', async () => {
+  const { DEFAULT_DESCRIPTION_TEMPLATE, blocksFromTemplate, templateFromBlocks, defaultSettings, templatePieces } = await import('@lumora/shared');
+  const blocks = blocksFromTemplate(DEFAULT_DESCRIPTION_TEMPLATE);
+  assert.deepEqual(
+    blocks.map((b) => (b.kind === 'var' ? `${b.name}|${b.heading}` : 'text')),
+    ['ai.overview|', 'fields.description|', 'reporter|Reporter', 'steps|Steps to reproduce', 'transcript|What the user said', 'console|Console', 'network|Failed network requests', 'environment|Environment', 'attachments|'],
+  );
+  assert.equal(templateFromBlocks(blocks), DEFAULT_DESCRIPTION_TEMPLATE);
+  // Free text survives as its own block.
+  const custom = blocksFromTemplate('Thanks for the report!\n\n## Console\n{{console}}\n\nSee **runbook**.');
+  assert.deepEqual(custom.map((b) => b.kind), ['text', 'var', 'text']);
+  assert.ok(templatePieces(defaultSettings().template.fields).some((p) => p.name === 'fields.category'));
+});

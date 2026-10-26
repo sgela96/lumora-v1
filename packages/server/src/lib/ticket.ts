@@ -1,4 +1,4 @@
-import { buildSteps, formatOffset, type Locale, type ProjectSettings, type ReportPayload, type Step } from '@lumora/shared';
+import { buildSteps, cleanupMarkdown, collapseTitle, fillTemplate, formatOffset, type Locale, type ProjectSettings, type ReportPayload, type Step } from '@lumora/shared';
 import type { AiResult } from './ai';
 import type { Transcript } from './transcribe';
 
@@ -40,8 +40,8 @@ export function stepsFor(payload: ReportPayload, settings: ProjectSettings): { s
 export function renderTicket(input: RenderInput): RenderedTicket {
   const { payload, settings } = input;
   const vars = buildVariables(input);
-  const title = collapse(fill(settings.template.titleTemplate, vars)).slice(0, 250) || `Report ${input.reference}`;
-  const description = cleanup(fill(settings.template.descriptionTemplate, vars));
+  const title = collapseTitle(fillTemplate(settings.template.titleTemplate, vars)).slice(0, 250) || `Report ${input.reference}`;
+  const description = cleanupMarkdown(fillTemplate(settings.template.descriptionTemplate, vars));
   const category = typeof payload.fields.category === 'string' ? payload.fields.category : undefined;
   return { title, description, category };
 }
@@ -128,29 +128,6 @@ function buildVariables({ payload, steps, stepsAreRelative, attachments, ai, tra
     ? transcript.segments.map((s) => `- [${formatOffset(s.start * 1000)}] ${s.text}`).join('\n')
     : (transcript?.text ?? '');
   return vars;
-}
-
-function fill(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, name: string) => vars[name] ?? '');
-}
-
-function collapse(text: string): string {
-  return text.replace(/\[\s*\]\s*/g, '').replace(/\s+/g, ' ').trim();
-}
-
-/** Drops headings whose section ended up empty and squeezes blank lines. */
-function cleanup(markdown: string): string {
-  const lines = markdown.split('\n');
-  const out: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (/^#{1,6}\s/.test(lines[i])) {
-      let j = i + 1;
-      while (j < lines.length && !lines[j].trim()) j++;
-      if (j >= lines.length || /^#{1,6}\s/.test(lines[j])) continue;
-    }
-    out.push(lines[i]);
-  }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function indent(text: string): string {

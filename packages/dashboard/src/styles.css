@@ -626,3 +626,74 @@ button.nav-link { width: 100%; border: 0; background: none; font: inherit; text-
 
 .input.invalid { box-shadow: inset 0 0 0 1.5px var(--danger); }
 .field-error { color: var(--danger); }
+
+/* ---------- Ticket template builder ---------- */
+.tpl-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.tpl-preview { position: sticky; top: 20px; min-width: 0; }
+@media (max-width: 1100px) { .tpl-grid { grid-template-columns: minmax(0, 1fr); } .tpl-preview { position: static; } }
+
+.token-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 0; border-radius: 999px; background: var(--fill); color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer; }
+.token-chip:hover { background: var(--accent-soft); color: var(--text); }
+.token-chip svg { display: block; }
+
+.tray { display: grid; gap: 12px; padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.tray-group { display: grid; gap: 6px; }
+.tray-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tray-label svg { display: block; }
+.tray-pieces { display: flex; flex-wrap: wrap; gap: 6px; }
+.piece { --c: var(--accent); display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px 6px 9px; border: 0; border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: grab; box-shadow: inset 3px 0 0 var(--c), var(--shadow); transition: transform .15s, box-shadow .15s, opacity .15s; }
+.piece:hover:not(:disabled) { transform: translateY(-1px); box-shadow: inset 3px 0 0 var(--c), 0 6px 14px -8px rgba(0, 0, 0, .3); }
+.piece:disabled { opacity: .45; cursor: default; }
+.piece svg { display: block; flex: none; }
+.piece-report, .block-report { --c: #f0b429; }
+.piece-technical, .block-technical { --c: #3987e5; }
+.piece-ai, .block-ai { --c: #b07ad8; }
+.piece-context, .block-context { --c: #5bbf8a; }
+.piece-text, .block-text { --c: var(--muted); }
+
+.layout { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; min-height: 80px; }
+.layout-empty { display: grid; place-items: center; min-height: 90px; border: 1.5px dashed var(--separator); border-radius: 14px; color: var(--muted); font-size: 13px; }
+.block { --c: var(--accent); position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 12px 10px 12px 8px; border-radius: 14px; background: var(--surface); box-shadow: inset 4px 0 0 var(--c), var(--shadow); cursor: grab; }
+.block:active { cursor: grabbing; }
+/* The connector between pieces, like a puzzle tab. */
+.block + .block::before { content: ""; position: absolute; left: 30px; top: -9px; width: 14px; height: 10px; border-radius: 0 0 7px 7px; background: var(--surface); box-shadow: inset 0 -1px 0 var(--separator); }
+.block.drop-before { box-shadow: inset 4px 0 0 var(--c), 0 -3px 0 0 var(--accent); }
+.block.drop-after { box-shadow: inset 4px 0 0 var(--c), 0 3px 0 0 var(--accent); }
+.block-grip { display: grid; place-items: center; height: 30px; color: var(--muted); }
+.block-grip svg { display: block; }
+.block-body { display: grid; gap: 6px; min-width: 0; }
+.block-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.block-name { font-weight: 600; font-size: 13.5px; }
+.block-actions { display: flex; gap: 2px; }
+.input-sm { padding: 6px 10px; font-size: 13px; min-height: 0; }
+.icon-btn.sm { width: 28px; height: 28px; border-radius: 8px; }
+.icon-btn:disabled { opacity: .35; cursor: default; background: transparent; }
+.icon-btn.danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
+
+.field-row { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--separator); }
+.field-row:first-of-type { border-top: 0; }
+.field-editor { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.field-extra { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+@media (max-width: 720px) { .field-editor { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+/* Preview: a ticket as it would look in each tool. */
+.ticket-mock { border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-lg); padding: 18px 20px 22px; max-height: calc(100vh - 140px); overflow: auto; }
+.mock-bar { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.mock-status { margin-left: auto; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: var(--fill); color: var(--text-2); }
+.mock-title { margin: 10px 0 12px; font-size: 19px; line-height: 1.3; letter-spacing: -.01em; }
+.look-jira .mock-status { background: #dfe1e6; color: #42526e; text-transform: uppercase; font-size: 10.5px; }
+.look-jira .mock-title { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #172b4d; }
+:root[data-theme="dark"] .look-jira .mock-title { color: var(--text); }
+.look-github .mock-title { font-size: 21px; font-weight: 400; }
+.look-github .mock-status { background: #1f883d; color: #fff; border-radius: 999px; }
+.look-zendesk .mock-status { background: #e34f32; color: #fff; }
+.look-slack { border-left: 4px solid #e0b100; }
+.look-slack .mock-title { font-size: 15px; }
+.md-preview { font-size: 13.5px; line-height: 1.55; color: var(--text-2); overflow-wrap: anywhere; }
+.md-preview h2, .md-preview h3 { font-size: 14px; margin: 16px 0 6px; color: var(--text); }
+.md-preview p { margin: 6px 0; }
+.md-preview ul, .md-preview ol { margin: 6px 0; padding-left: 20px; }
+.md-preview pre { margin: 6px 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 12px; white-space: pre-wrap; }
+.md-preview code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.md-preview blockquote { margin: 6px 0; padding: 8px 12px; border-left: 3px solid #b07ad8; border-radius: 0 10px 10px 0; background: var(--fill); }
+.md-preview a { color: var(--info); }
