@@ -13,7 +13,7 @@ const TABS = [
   { id: 'template', label: 'Ticket template' },
   { id: 'capture', label: 'Data capture' },
   { id: 'integrations', label: 'Integrations' },
-  { id: 'general', label: 'General' },
+  { id: 'general', label: 'App' },
 ] as const;
 
 export function SettingsPage({ project, tab }: { project: Project; tab: string }) {

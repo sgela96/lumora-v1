@@ -157,7 +157,9 @@ ${NEBULA_CSS}
   box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 0 0 .5px var(--lu-border);
 }
 .lu-option strong { display: block; font-weight: 590; }
-.lu-option span { display: block; color: var(--lu-muted); font-size: 12.5px; }
+.lu-option div > span { display: block; color: var(--lu-muted); font-size: 12.5px; }
+.lu-option .lu-option-icon { display: grid; place-items: center; }
+.lu-option .lu-option-icon svg { display: block; }
 .lu-option .lu-badge { margin-left: auto; }
 .lu-chev-right { margin-left: auto; color: var(--lu-muted); opacity: .6; }
 
@@ -342,7 +344,8 @@ ${NEBULA_CSS}
 .lu-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--lu-solid); box-shadow: 0 0 0 .5px var(--lu-border); cursor: pointer; padding: 0; margin: 0 2px; }
 .lu-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lu-text); }
 .lu-sep { width: 1px; height: 20px; background: var(--lu-border); margin: 0 4px; }
-.lu-annotator-stage { flex: 1; display: grid; place-items: center; padding: 18px; min-height: 0; }
+.lu-annotator-stage { position: relative; flex: 1; display: grid; place-items: center; padding: 18px; min-height: 0; }
+.lu-annot-text { position: absolute; transform: translateY(-50%); min-width: 160px; padding: 4px 8px; border: 1.5px dashed currentColor; border-radius: 8px; background: rgba(255,255,255,.92); font: 600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; outline: none; }
 .lu-annotator-stage canvas { max-width: 100%; max-height: 100%; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.5); cursor: crosshair; touch-action: none; background: #fff; }
 .lu-annotator-hint { text-align: center; color: rgba(255,255,255,.75); font-size: 12.5px; padding: 0 16px 16px; }
 

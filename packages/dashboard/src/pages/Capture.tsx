@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { LogLevel } from '@lumora/shared';
 import type { Project } from '../api';
 import { Card, Field, SaveBar, SectionIntro, ToggleRow, useToast } from '../components/ui';
-import { useApp, useFeatureLock, useSettingsDraft } from '../state';
+import { useApp, useFeatureLock, useFeatureTier, useSettingsDraft } from '../state';
 
 const LEVELS: LogLevel[] = ['error', 'warn', 'info', 'log', 'debug'];
 
@@ -10,6 +10,7 @@ export function CapturePage({ project }: { project: Project }) {
   const { me, updateProject } = useApp();
   const toast = useToast();
   const lock = useFeatureLock();
+  const tier = useFeatureTier();
   const { draft, update, dirty, saving, save, reset } = useSettingsDraft(project, updateProject);
   const c = draft.capture;
   const [selector, setSelector] = useState('');
@@ -41,7 +42,7 @@ export function CapturePage({ project }: { project: Project }) {
           </Card>
 
           <Card title="Developer console">
-            <ToggleRow title="Console messages" description="Including uncaught errors and unhandled promise rejections, with stack traces." checked={c.console.enabled} onChange={(v) => update((s) => void (s.capture.console.enabled = v))} lockedTo={lock('console')}>
+            <ToggleRow title="Console messages" description="Including uncaught errors and unhandled promise rejections, with stack traces." checked={c.console.enabled} onChange={(v) => update((s) => void (s.capture.console.enabled = v))} lockedTo={lock('console')} tier={tier('console')}>
               <div className="stack-sm">
                 <div className="row">
                   {LEVELS.map((level) => (
@@ -60,7 +61,7 @@ export function CapturePage({ project }: { project: Project }) {
                 </Field>
               </div>
             </ToggleRow>
-            <ToggleRow title="Network requests" description="Method, URL, status and timing of fetch/XHR calls. Bodies and headers are never captured." checked={c.network.enabled} onChange={(v) => update((s) => void (s.capture.network.enabled = v))} lockedTo={lock('network')}>
+            <ToggleRow title="Network requests" description="Method, URL, status and timing of fetch/XHR calls. Bodies and headers are never captured." checked={c.network.enabled} onChange={(v) => update((s) => void (s.capture.network.enabled = v))} lockedTo={lock('network')} tier={tier('network')}>
               <label className="row small">
                 <input type="checkbox" checked={c.network.failedOnly} onChange={(e) => update((s) => void (s.capture.network.failedOnly = e.target.checked))} /> Only failed requests (4xx, 5xx, network errors)
               </label>
@@ -71,8 +72,8 @@ export function CapturePage({ project }: { project: Project }) {
 
         <div className="stack">
           <Card title="Steps to reproduce">
-            <ToggleRow title="Recent actions" description="The last clicks, inputs and page changes before the user opened Lumora." checked={c.breadcrumbs} onChange={(v) => update((s) => void (s.capture.breadcrumbs = v))} lockedTo={lock('breadcrumbs')} />
-            <ToggleRow title="Steps from screen recordings" description="Turns what the user did while recording into written, timestamped steps." checked={c.recordingSteps} onChange={(v) => update((s) => void (s.capture.recordingSteps = v))} lockedTo={lock('recordingSteps')} />
+            <ToggleRow title="Recent actions" description="The last clicks, inputs and page changes before the user opened Lumora." checked={c.breadcrumbs} onChange={(v) => update((s) => void (s.capture.breadcrumbs = v))} lockedTo={lock('breadcrumbs')} tier={tier('breadcrumbs')} />
+            <ToggleRow title="Steps from screen recordings" description="Turns what the user did while recording into written, timestamped steps." checked={c.recordingSteps} onChange={(v) => update((s) => void (s.capture.recordingSteps = v))} lockedTo={lock('recordingSteps')} tier={tier('recordingSteps')} />
             <ToggleRow
               title="AI Powered"
               description={
@@ -82,7 +83,7 @@ export function CapturePage({ project }: { project: Project }) {
               }
               checked={c.aiSteps}
               onChange={(v) => update((s) => void (s.capture.aiSteps = v))}
-              lockedTo={lock('aiSteps')}
+              lockedTo={lock('aiSteps')} tier={tier('aiSteps')}
               lockLabel={me.account.plan === 'pro' ? 'AI Powered extra' : undefined}
             />
           </Card>
@@ -95,7 +96,7 @@ export function CapturePage({ project }: { project: Project }) {
               description="CSS selectors that are blacked out in screenshots and never recorded as steps."
               checked={!lock('redactionRules')}
               onChange={() => {}}
-              lockedTo={lock('redactionRules')}
+              lockedTo={lock('redactionRules')} tier={tier('redactionRules')}
             >
               <div className="stack-sm">
                 <div className="chip-list">

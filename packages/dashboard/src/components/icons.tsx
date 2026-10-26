@@ -11,6 +11,22 @@ function Icon({ size = 18, children }: { size?: number; children: ReactNode }) {
 type P = { size?: number };
 
 export const Icons = {
+  sun: (p: P) => (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </Icon>
+  ),
+  chevronDown: (p: P) => (
+    <Icon {...p}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  ),
+  moon: (p: P) => (
+    <Icon {...p}>
+      <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+    </Icon>
+  ),
   overview: (p: P) => (
     <Icon {...p}>
       <path d="M4 19V10M10 19V5M16 19v-7M22 19H2" />

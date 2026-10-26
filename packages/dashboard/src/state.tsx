@@ -36,6 +36,11 @@ export function useFeatureLock() {
   return (feature: keyof PlanLimits['features']) => (me.limits.features[feature] ? undefined : minimumPlanFor(feature));
 }
 
+/** `tier('recording')` → the plan that introduces the feature ('free' for features every plan has). */
+export function useFeatureTier() {
+  return (feature: keyof PlanLimits['features']) => minimumPlanFor(feature);
+}
+
 /** Local draft of a project's settings with dirty tracking and save. */
 export function useSettingsDraft(project: Project, onSaved: (p: Project) => void) {
   const [draft, setDraft] = useState<ProjectSettings>(project.settings);

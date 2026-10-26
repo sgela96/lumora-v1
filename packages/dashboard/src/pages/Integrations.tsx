@@ -1,4 +1,4 @@
-import { INTEGRATION_CATEGORIES, minimumPlanForIntegration, PLANS, type IntegrationCategory } from '@lumora/shared';
+import { INTEGRATION_CATEGORIES, minimumPlanForIntegration, PLANS, type IntegrationCategory, formatError } from '@lumora/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type ConnectorInfo, type Integration, type Project } from '../api';
 import { Icons, LogoTile } from '../components/icons';
@@ -167,11 +167,15 @@ export function IntegrationForm({
   const guide = SETUP_GUIDES[connector.type];
   const tip = error ? troubleshoot(error) : null;
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(connector.fields.map((f) => [f.key, true])));
     setBusy(true);
     setError('');
     try {
+      const invalid = connector.fields.map((f) => formatError(f.type, config[f.key] ?? '', f.label)).find(Boolean);
+      if (invalid) throw new Error(invalid);
       const body = { name, config, categories: only, type: connector.type };
       const saved = integration
         ? await api<Integration>(`/integrations/${integration.id}`, { method: 'PATCH', body })
@@ -200,7 +204,7 @@ export function IntegrationForm({
         </span>
       }
     >
-      <form className="stack" onSubmit={submit}>
+      <form className="stack" onSubmit={submit} noValidate>
         <p className="muted">{connector.description}</p>
         {guide && (
           <div className="guide">
@@ -222,10 +226,16 @@ export function IntegrationForm({
         </Field>
         <div className="grid-2">
           {connector.fields.map((f) => (
-            <Field key={f.key} label={`${f.label}${f.required ? '' : ' (optional)'}`} hint={f.help}>
+            <Field
+              key={f.key}
+              label={`${f.label}${f.required ? '' : ' (optional)'}`}
+              hint={touched[f.key] && formatError(f.type, config[f.key] ?? '', f.label) ? <span className="field-error">{formatError(f.type, config[f.key] ?? '', f.label)}</span> : f.help}
+            >
               <input
-                className="input"
-                type={f.type === 'password' ? 'password' : f.type === 'email' ? 'email' : 'text'}
+                className={`input${touched[f.key] && formatError(f.type, config[f.key] ?? '', f.label) ? ' invalid' : ''}`}
+                type={f.type === 'password' ? 'password' : f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : 'text'}
+                inputMode={f.type === 'url' ? 'url' : f.type === 'email' ? 'email' : undefined}
+                onBlur={() => setTouched({ ...touched, [f.key]: true })}
                 placeholder={f.placeholder}
                 required={f.required && !(f.type === 'password' && integration)}
                 value={config[f.key] ?? ''}

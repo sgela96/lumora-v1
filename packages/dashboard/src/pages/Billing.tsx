@@ -35,7 +35,7 @@ const COMPARE: { group: string; rows: [string, string, string, string][] }[] = [
       ['Screenshots with markup', '✓', '✓', '✓'],
       ['Screen recording with voice', '—', '2 min (10 with extra)', '10 min'],
       ['Written steps from recordings', '—', '✓', '✓'],
-      ['Your branding (no “Powered by”)', '—', '✓', '✓'],
+      ['White label (no “Powered by Lumora”)', '—', '—', '✓'],
     ],
   },
   {
@@ -148,7 +148,9 @@ export function BillingPage() {
         {PLAN_ORDER.map((id) => {
           const plan = catalog.plans[id];
           const isCurrent = id === me.account.plan && !trialing;
-          const featured = id === 'pro';
+          // On Business, Pro is part of what they already have, so it isn't offered as a move.
+          const included = id === 'pro' && me.account.plan === 'business' && !trialing;
+          const featured = id === 'pro' && !included;
           return (
             <div key={id} className={`card price-card lift${featured ? ' featured iris-border' : ''}`}>
               {featured && <span className="ribbon">Most popular</span>}
@@ -174,10 +176,10 @@ export function BillingPage() {
                 <button
                   className={`btn ${featured && !isCurrent ? 'btn-primary' : ''}`}
                   style={{ width: '100%' }}
-                  disabled={isCurrent || busy !== null}
+                  disabled={isCurrent || included || busy !== null}
                   onClick={() => subscribe(id, id === 'pro' ? addons : {})}
                 >
-                  {isCurrent ? 'Current plan' : busy === id ? 'One moment…' : trialing && id === current ? `Keep ${plan.name}` : id === 'free' ? 'Switch to Free' : `Choose ${plan.name}`}
+                  {isCurrent ? 'Current plan' : included ? 'Included in Business' : busy === id ? 'One moment…' : trialing && id === current ? `Keep ${plan.name}` : id === 'free' ? 'Switch to Free' : `Choose ${plan.name}`}
                 </button>
               </div>
             </div>
@@ -185,6 +187,7 @@ export function BillingPage() {
         })}
       </div>
 
+      {!(me.account.plan === 'business' && !trialing) && (
       <Card
         title="Extras for Pro"
         actions={
@@ -228,6 +231,7 @@ export function BillingPage() {
           </button>
         </div>
       </Card>
+      )}
 
       <div>
         <button className="btn btn-ghost" onClick={() => setShowCompare(!showCompare)}>

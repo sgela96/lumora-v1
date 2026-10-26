@@ -121,7 +121,8 @@ test('stripe webhook signatures are verified', () => {
   const t = Math.floor(Date.now() / 1000);
   const sig = createHmac('sha256', secret).update(`${t}.${payload}`).digest('hex');
   assert.equal(verifyStripeSignature(payload, `t=${t},v1=${sig}`, secret), true);
-  assert.equal(verifyStripeSignature(payload, `t=${t},v1=${sig.replace(/.$/, '0')}`, secret), false);
+  const tampered = sig.slice(0, -1) + (sig.endsWith('0') ? '1' : '0');
+  assert.equal(verifyStripeSignature(payload, `t=${t},v1=${tampered}`, secret), false);
   assert.equal(verifyStripeSignature(payload, `t=${t - 3600},v1=${sig}`, secret), false);
 });
 

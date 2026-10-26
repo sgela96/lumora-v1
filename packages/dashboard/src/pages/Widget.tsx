@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import type { WidgetPosition } from '@lumora/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { clampSettingsToPlan, type WidgetPosition } from '@lumora/shared';
 import type { Project } from '../api';
 import { Card, Field, SaveBar, SectionIntro, ToggleRow, useToast } from '../components/ui';
-import { useApp, useFeatureLock, useSettingsDraft } from '../state';
+import { useApp, useFeatureLock, useFeatureTier, useSettingsDraft } from '../state';
 
 const POSITIONS: { id: WidgetPosition; label: string }[] = [
   { id: 'bottom-right', label: 'Bottom right' },
@@ -11,15 +11,29 @@ const POSITIONS: { id: WidgetPosition; label: string }[] = [
   { id: 'top-left', label: 'Top left' },
 ];
 
-const SWATCHES = ['#F59E0B', '#F97316', '#EF4444', '#EC4899', '#8B5CF6', '#3B82F6', '#10B981', '#18181B'];
-
 export function WidgetPage({ project }: { project: Project }) {
   const { me, updateProject } = useApp();
   const toast = useToast();
   const lock = useFeatureLock();
+  const tier = useFeatureTier();
   const { draft, update, dirty, saving, save, reset } = useSettingsDraft(project, updateProject);
   const [previewKey, setPreviewKey] = useState(0);
+  const frame = useRef<HTMLIFrameElement>(null);
   const a = draft.appearance;
+
+  // Live preview: the demo page's widget redraws with the unsaved settings, clamped to the plan.
+  const sendPreview = useCallback(() => {
+    frame.current?.contentWindow?.postMessage({ type: 'lumora:preview', settings: clampSettingsToPlan(draft, me.limits) }, location.origin);
+  }, [draft, me.limits]);
+  useEffect(() => {
+    const t = window.setTimeout(sendPreview, 200);
+    return () => window.clearTimeout(t);
+  }, [sendPreview]);
+  useEffect(() => {
+    const onReady = (e: MessageEvent) => e.origin === location.origin && e.data?.type === 'lumora:preview-ready' && sendPreview();
+    window.addEventListener('message', onReady);
+    return () => window.removeEventListener('message', onReady);
+  }, [sendPreview]);
 
   const onSave = async () => {
     try {
@@ -38,20 +52,6 @@ export function WidgetPage({ project }: { project: Project }) {
         <div className="stack">
           <Card title="Appearance">
             <div className="stack">
-              <Field label="Accent color">
-                <div className="row">
-                  <input className="input" type="color" value={a.accentColor} onChange={(e) => update((s) => void (s.appearance.accentColor = e.target.value.toUpperCase()))} />
-                  {SWATCHES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={c}
-                      onClick={() => update((s) => void (s.appearance.accentColor = c))}
-                      style={{ width: 26, height: 26, borderRadius: '50%', background: c, border: a.accentColor === c ? '3px solid var(--text)' : '2px solid var(--surface)', boxShadow: '0 0 0 1px var(--border)', cursor: 'pointer' }}
-                    />
-                  ))}
-                </div>
-              </Field>
               <div className="grid-2">
                 <Field label="Position">
                   <select className="select" value={a.position} onChange={(e) => update((s) => void (s.appearance.position = e.target.value as WidgetPosition))}>
@@ -94,7 +94,7 @@ export function WidgetPage({ project }: { project: Project }) {
           <Card title="Behaviour">
             <ToggleRow
               title="React to errors"
-              description="When the page throws an error the sun looks worried and gently offers to report it."
+              description="When the page throws an error the nebula glows and gently offers to report it."
               checked={a.proactiveOnError}
               onChange={(v) => update((s) => void (s.appearance.proactiveOnError = v))}
             />
@@ -102,8 +102,8 @@ export function WidgetPage({ project }: { project: Project }) {
               title="Show “Powered by Lumora”"
               checked={a.showBranding || !me.limits.features.removeBranding}
               onChange={(v) => update((s) => void (s.appearance.showBranding = v))}
-              lockedTo={lock('removeBranding')}
-              description={lock('removeBranding') ? 'Remove the footer link on a higher plan.' : undefined}
+              lockedTo={lock('removeBranding')} tier={tier('removeBranding')}
+              description={lock('removeBranding') ? 'Business can remove the footer link.' : undefined}
             />
           </Card>
 
@@ -114,7 +114,7 @@ export function WidgetPage({ project }: { project: Project }) {
               description="Users record what happens; Lumora writes the steps to reproduce from their clicks."
               checked={draft.reportTypes.recording}
               onChange={(v) => update((s) => void (s.reportTypes.recording = v))}
-              lockedTo={lock('recording')}
+              lockedTo={lock('recording')} tier={tier('recording')}
             >
               <div className="grid-2">
                 <Field label="Max length (seconds)" hint={`Your plan allows up to ${me.limits.features.recordingMaxSeconds}s`}>
@@ -146,9 +146,9 @@ export function WidgetPage({ project }: { project: Project }) {
             </button>
           }
         >
-          <iframe key={previewKey} className="preview-frame" title="Widget preview" src={`/demo/?key=${encodeURIComponent(project.publicKey)}&preview=1`} />
+          <iframe ref={frame} key={previewKey} className="preview-frame" title="Widget preview" src={`/demo/?key=${encodeURIComponent(project.publicKey)}&preview=1`} />
           <p className="hint" style={{ marginTop: 8 }}>
-            The preview uses the saved settings{dirty ? ' — save to see your changes' : ''}.
+            Changes show here right away{dirty ? '. Save to publish them on your site' : ''}. The nebula is always Lumora yellow.
           </p>
         </Card>
       </div>

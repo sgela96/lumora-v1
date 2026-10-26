@@ -6,6 +6,7 @@ import { Tour, tourSteps } from '../components/Tour';
 import { WelcomeModal } from '../components/WelcomeModal';
 import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
 import { TrialButton } from '../components/TrialButton';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { navigate, useApp, useRoute } from '../state';
 import { BillingPage } from './Billing';
 import { OverviewPage } from './Overview';
@@ -100,18 +101,6 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   if (root === 'billing') page = <BillingPage />;
   else if (project) {
     if (section === 'overview') page = <OverviewPage key={project.id} project={project} />;
-    else if (section === 'reports' && !supportCenter)
-      page = (
-        <div className="stack rise">
-          <PageHead title="Reports" subtitle="Every report from your app in one place." />
-          <div style={{ display: 'grid', placeItems: 'center', padding: '24px 0' }}>
-            <Upsell title="Your support command center">
-              The report repository is part of Business: every report with the live status of its ticket in Jira, Zendesk or ServiceNow, filters and search,
-              similar reports grouped into issues, and the advanced dashboard.
-            </Upsell>
-          </div>
-        </div>
-      );
     else if (section === 'reports' && sub) page = <TicketPage key={sub} project={project} ticketId={sub} />;
     else if (section === 'reports') page = <ReportsPage key={project.id} project={project} />;
     else if (section === 'settings') page = <SettingsPage key={project.id} project={project} tab={sub ?? 'install'} />;
@@ -119,7 +108,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
 
   const nav = [
     { id: 'overview', label: 'Overview', icon: Icons.overview, locked: !dashboard },
-    { id: 'reports', label: 'Reports', icon: Icons.reports, count: project?.tickets, locked: !supportCenter },
+    { id: 'reports', label: 'Reports', icon: Icons.reports, count: project?.tickets, locked: false },
     { id: 'settings', label: 'Settings', icon: Icons.settings },
   ];
 
@@ -129,9 +118,13 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
         <span />
       </div>
       <aside className={`sidebar${menuOpen ? ' open' : ''}`}>
-        <a className="brand" href="#/">
-          <Nebula /> Lumora
-        </a>
+        <div className="brand-row">
+          <a className="brand" href="#/">
+            <Nebula /> Lumora
+            {me.account.plan !== 'free' && <span className={`plan-chip plan-${me.account.plan}`}>{me.limits.name}</span>}
+          </a>
+          <ThemeToggle />
+        </div>
 
         <div className="field" style={{ padding: '0 2px 10px' }}>
           <select

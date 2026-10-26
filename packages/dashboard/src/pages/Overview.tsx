@@ -74,27 +74,25 @@ export function OverviewPage({ project }: { project: Project }) {
 
   return (
     <div className="stack rise">
-      <Hero
-        name={me.user.name}
-        lede={lede}
-        actions={
-          advanced && (
-            <Segmented
-              label="Time range"
-              value={days}
-              onChange={setDays}
-              options={[
-                { value: '7', label: '7 days' },
-                { value: '30', label: '30 days' },
-                { value: '90', label: '90 days' },
-              ]}
-            />
-          )
-        }
-      />
+      <Hero name={me.user.name} lede={lede} />
 
       <GettingStarted project={project} />
 
+      {advanced && (
+        <div className="spread">
+          <h2 className="section-title">Last {metrics.days} days</h2>
+          <Segmented
+            label="Time range"
+            value={days}
+            onChange={setDays}
+            options={[
+              { value: '7', label: '7 days' },
+              { value: '30', label: '30 days' },
+              { value: '90', label: '90 days' },
+            ]}
+          />
+        </div>
+      )}
       {metrics.level === 'advanced' ? <AdvancedTiles m={metrics} onOpen={() => reportsLink({ status: 'open' })} /> : <BasicTiles m={metrics} />}
 
       <Card
@@ -157,8 +155,8 @@ export function OverviewPage({ project }: { project: Project }) {
             <Card className="lift" title="By category">
               <BarList items={metrics.byCategory} />
             </Card>
-            <Card className="lift" title="Latest reports">
-              <Activity items={metrics.recent} />
+            <Card className="lift" title="Latest reports" actions={<a className="small" href={`#/p/${project.id}/reports`}>All reports</a>}>
+              <Activity items={metrics.recent} onOpen={(r) => navigate(`/p/${project.id}/reports/${r.id}`)} />
             </Card>
           </div>
           <div className="card iris-border card-pad spread" style={{ borderRadius: 22 }}>

@@ -17,7 +17,7 @@ export function ReportsPage({ project }: { project: Project }) {
   const { me } = useApp();
   const supportCenter = me.limits.features.supportCenter;
   const [params, setParams] = useHashQuery();
-  const status = (params.get('status') ?? 'open') as TicketStatus | 'all';
+  const status = (supportCenter ? params.get('status') ?? 'open' : 'all') as TicketStatus | 'all';
   const view = supportCenter && params.get('view') === 'issues' ? 'issues' : 'reports';
   const [list, setList] = useState<TicketList | null>(null);
   const [issues, setIssues] = useState<IssueGroup[] | null>(null);
@@ -70,6 +70,19 @@ export function ReportsPage({ project }: { project: Project }) {
         actions={<input className="input input-search" placeholder="Search" aria-label="Search reports" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 240 }} />}
       />
 
+      {!supportCenter && (
+        <div className="notice notice-accent spread" style={{ gap: 12, flexWrap: 'wrap' }}>
+          <span>
+            Every report from the last {list?.historyDays ?? me.limits.historyDays} days, with its screenshot, steps and console. <strong>Business</strong> adds statuses synced
+            from your tools, filters, a board view and similar reports grouped into issues.
+          </span>
+          <a className="btn btn-sm" href="#/billing" style={{ textDecoration: 'none' }}>
+            See Business
+          </a>
+        </div>
+      )}
+
+      {supportCenter && (
       <div className="spread" style={{ flexWrap: 'wrap' }}>
         <Segmented
           label="Status"
@@ -98,6 +111,9 @@ export function ReportsPage({ project }: { project: Project }) {
         </div>
       </div>
 
+      )}
+
+      {supportCenter && (
       <div className="filters">
         <select className="select" aria-label="Category" value={params.get('category') ?? ''} onChange={(e) => setParams({ category: e.target.value })}>
           <option value="">All categories</option>
@@ -158,6 +174,7 @@ export function ReportsPage({ project }: { project: Project }) {
           </button>
         )}
       </div>
+      )}
 
       {params.get('issue') && list?.items[0]?.issue && (
         <div className="notice spread">
@@ -183,7 +200,7 @@ export function ReportsPage({ project }: { project: Project }) {
               <thead>
                 <tr>
                   <th>Report</th>
-                  <th>Status</th>
+                  {supportCenter && <th>Status</th>}
                   <th>Linked ticket</th>
                   <th>Reporter</th>
                   <th className="num">Received</th>
@@ -191,7 +208,7 @@ export function ReportsPage({ project }: { project: Project }) {
               </thead>
               <tbody>
                 {list.items.map((t) => (
-                  <ReportRow key={t.id} ticket={t} projectId={project.id} />
+                  <ReportRow key={t.id} ticket={t} projectId={project.id} showStatus={supportCenter} />
                 ))}
               </tbody>
             </table>
@@ -209,7 +226,7 @@ export function ReportsPage({ project }: { project: Project }) {
   );
 }
 
-function ReportRow({ ticket: t, projectId }: { ticket: TicketSummary; projectId: string }) {
+function ReportRow({ ticket: t, projectId, showStatus }: { ticket: TicketSummary; projectId: string; showStatus: boolean }) {
   const kind = KIND[t.kind] ?? KIND.describe;
   const linked = t.deliveries.find((d) => d.status === 'sent' && (d.displayId || d.externalId));
   const failed = t.deliveries.some((d) => d.status === 'failed');
@@ -237,9 +254,11 @@ function ReportRow({ ticket: t, projectId }: { ticket: TicketSummary; projectId:
           </div>
         </div>
       </td>
-      <td>
-        <StatusBadge status={t.status} label={t.externalStatus} />
-      </td>
+      {showStatus && (
+        <td>
+          <StatusBadge status={t.status} label={t.externalStatus} />
+        </td>
+      )}
       <td>
         {linked ? (
           <span className="ref-chip" title={linked.name}>
