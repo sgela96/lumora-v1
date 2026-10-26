@@ -11,6 +11,37 @@ function Icon({ size = 18, children }: { size?: number; children: ReactNode }) {
 type P = { size?: number };
 
 export const Icons = {
+  list: (p: P) => (
+    <Icon {...p}>
+      <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+    </Icon>
+  ),
+  board: (p: P) => (
+    <Icon {...p}>
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="10" y="4" width="5" height="10" rx="1.5" />
+      <rect x="17" y="4" width="4" height="13" rx="1.5" />
+    </Icon>
+  ),
+  columns: (p: P) => (
+    <Icon {...p}>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="18" cy="18" r="2" />
+    </Icon>
+  ),
+  bell: (p: P) => (
+    <Icon {...p}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Icon>
+  ),
+  bookmark: (p: P) => (
+    <Icon {...p}>
+      <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </Icon>
+  ),
   sun: (p: P) => (
     <Icon {...p}>
       <circle cx="12" cy="12" r="4" />
@@ -187,6 +218,7 @@ const BRAND: Record<string, [string, string]> = {
   freshservice: ['Fs', '#0DB4BE'],
   webhook: ['{ }', '#636366'],
   slack: ['Sl', '#4A154B'],
+  teams: ['Te', '#5B5FC7'],
   email: ['@', '#8E8E93'],
 };
 

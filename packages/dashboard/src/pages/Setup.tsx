@@ -233,7 +233,7 @@ function ConnectStep({ project, connectors, allowed, onNext }: { project: Projec
           {connected ? 'Continue' : 'Skip for now'}
         </button>
         <a className="btn btn-ghost" href={`#/p/${project.id}/settings/integrations`} style={{ textDecoration: 'none' }}>
-          See all 19 integrations
+          See all 20 integrations
         </a>
       </div>
     </div>

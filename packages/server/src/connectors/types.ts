@@ -44,9 +44,30 @@ export interface ExternalStatus {
   status: TicketStatus;
   /** The status as the remote tool names it ("In Review", "Pending", "Closed"…). */
   label: string;
+  /** Who works on it in the remote tool, when the tool says. */
+  assignee?: { name: string; email?: string } | null;
+}
+
+/** One status of the remote tool's workflow, with the Lumora category it maps to. */
+export interface RemoteStatus {
+  name: string;
+  category: TicketStatus;
 }
 
 export type ConnectorConfig = Record<string, string>;
+
+export interface Reminder {
+  assignee: { name: string; email?: string | null } | null;
+  title: string;
+  reference: string;
+  /** Link to the report in Lumora. */
+  url: string;
+  /** Link to the ticket in the tool (Jira, Zendesk…), when there is one. */
+  ticketUrl?: string;
+  status?: string | null;
+  note?: string;
+  from: string;
+}
 
 export interface Connector {
   type: IntegrationType;
@@ -61,6 +82,12 @@ export interface Connector {
    * send()). Absent for destinations without a workflow (webhook, Slack, e-mail).
    */
   fetchStatus?(config: ConnectorConfig, externalId: string): Promise<ExternalStatus>;
+  /** The statuses of the remote workflow, so Lumora can offer the same ones. */
+  listStatuses?(config: ConnectorConfig): Promise<RemoteStatus[]>;
+  /** Moves a ticket to one of those statuses (Jira transition, Zendesk status, GitHub state…). */
+  setStatus?(config: ConnectorConfig, externalId: string, status: RemoteStatus): Promise<void>;
+  /** Nudges the person working on a report (Slack DM or a channel post). Returns what was done. */
+  remind?(config: ConnectorConfig, reminder: Reminder): Promise<string>;
   /** Creates the status webhook in the remote tool, pointing at `url`. Returns the remote hook id. */
   registerStatusWebhook?(config: ConnectorConfig, url: string): Promise<{ id: string; note?: string }>;
   unregisterStatusWebhook?(config: ConnectorConfig, id: string): Promise<void>;

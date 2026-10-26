@@ -106,7 +106,7 @@ export function OverviewPage({ project }: { project: Project }) {
       {metrics.level === 'advanced' ? (
         <>
           <div className="grid-2" style={{ alignItems: 'start' }}>
-            <Card className="lift" title="Top issues" actions={<a className="small" href={`#/p/${project.id}/reports?view=issues`}>All issues</a>}>
+            <Card className="lift" title="Top issues" actions={<a className="small" href={`#/p/${project.id}/reports?mode=issues`}>All issues</a>}>
               {metrics.topIssues.length === 0 ? (
                 <p className="muted small">No reports in this period.</p>
               ) : (

@@ -366,3 +366,91 @@ test('new accounts start on Free and can opt into one 7-day Pro trial', async ()
 
   assert.equal((await call('/api/billing/trial', { body: {} })).status, 409, 'only one trial per account');
 });
+
+test('Support Center: tool statuses, priorities, bulk edits, saved views and reminders', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Lee', company: 'Initech', email: 'lee@initech.test', password: 'password123' } });
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
+  const [project] = (await call('/api/projects')).body;
+
+  // A fake Jira with a three-step workflow, and a fake Slack that records what it receives.
+  const workflow = [
+    { name: 'To Do', statusCategory: { key: 'new' } },
+    { name: 'In Review', statusCategory: { key: 'indeterminate' } },
+    { name: 'Done', statusCategory: { key: 'done' } },
+  ];
+  const issues: Record<string, { status: (typeof workflow)[number]; assignee: { displayName: string; emailAddress: string } | null }> = {};
+  const slack: string[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url.startsWith('https://hooks.slack.com')) {
+      slack.push(JSON.parse(String(init?.body)).text);
+      return new Response('ok');
+    }
+    if (!url.startsWith('https://initech.atlassian.net')) return realFetch(input, init);
+    if (url.endsWith('/rest/api/2/issue') && init?.method === 'POST') {
+      const key = `INI-${Object.keys(issues).length + 1}`;
+      issues[key] = { status: workflow[0], assignee: { displayName: 'Milton', emailAddress: 'milton@initech.test' } };
+      return new Response(JSON.stringify({ key }), { status: 201 });
+    }
+    if (url.endsWith('/project/INI/statuses')) return new Response(JSON.stringify([{ name: 'Bug', statuses: workflow }]));
+    const transition = url.match(/\/issue\/(INI-\d+)\/transitions$/);
+    if (transition && init?.method === 'POST') {
+      const id = JSON.parse(String(init.body)).transition.id as string;
+      issues[transition[1]].status = workflow[Number(id)];
+      return new Response(null, { status: 204 });
+    }
+    if (transition) return new Response(JSON.stringify({ transitions: workflow.map((s, i) => ({ id: String(i), to: { name: s.name } })) }));
+    const m = url.match(/\/rest\/api\/2\/issue\/(INI-\d+)\?/);
+    if (m) {
+      const issue = issues[m[1]];
+      return new Response(JSON.stringify({ key: m[1], fields: { status: issue.status, assignee: issue.assignee } }));
+    }
+    return new Response('{}');
+  }) as typeof fetch;
+
+  try {
+    await call(`/api/projects/${project.id}/integrations`, { body: { type: 'jira', config: { siteUrl: 'https://initech.atlassian.net', email: 'a@b.c', apiToken: 't', projectKey: 'INI' } } });
+    for (const n of [1, 2]) await report(project.publicKey, { kind: 'describe', fields: { category: 'Bug', description: `Stapler missing ${n}` }, reporter: {}, metadata: {} });
+    await new Promise((r) => setTimeout(r, 300));
+
+    const flow = (await call(`/api/projects/${project.id}/workflow`)).body;
+    assert.equal(flow.source, 'tool');
+    assert.deepEqual(flow.statuses.map((s: { name: string; category: string }) => `${s.name}:${s.category}`), ['To Do:open', 'In Review:in_progress', 'Done:resolved']);
+
+    const { items } = (await call(`/api/projects/${project.id}/tickets`)).body;
+    const [first, second] = items;
+    // Picking a tool status moves the Jira issue and reads it back, assignee included.
+    const moved = (await call(`/api/tickets/${first.id}`, { method: 'PATCH', body: { externalStatus: 'In Review' } })).body;
+    assert.equal(moved.externalStatus, 'In Review');
+    assert.equal(moved.status, 'in_progress');
+    assert.equal(moved.assignee.name, 'Milton');
+    assert.equal((await call(`/api/tickets/${first.id}`, { method: 'PATCH', body: { externalStatus: 'Shipped' } })).status, 400);
+
+    const bulk = (await call(`/api/projects/${project.id}/tickets/bulk`, { body: { ids: [first.id, second.id, 'tk_nope'], patch: { priority: 'urgent' } } })).body;
+    assert.equal(bulk.results.length, 2);
+    const urgent = (await call(`/api/projects/${project.id}/tickets?priority=urgent`)).body;
+    assert.equal(urgent.total, 2);
+    assert.equal((await call(`/api/tickets/${first.id}`, { method: 'PATCH', body: { priority: 'whenever' } })).status, 400);
+
+    const view = (await call(`/api/projects/${project.id}/views`, { body: { name: 'Urgent bugs', query: 'priority=urgent', layout: { mode: 'board', groupBy: 'status' } } })).body;
+    assert.equal((await call(`/api/projects/${project.id}/views`)).body[0].layout.mode, 'board');
+    await call(`/api/views/${view.id}`, { method: 'DELETE', body: {} });
+    assert.equal((await call(`/api/projects/${project.id}/views`)).body.length, 0);
+
+    // Reminders need Slack or Teams.
+    assert.equal((await call(`/api/tickets/${first.id}/remind`, { body: {} })).status, 400);
+    await call(`/api/projects/${project.id}/integrations`, { body: { type: 'slack', config: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' } } });
+    const channels = (await call(`/api/projects/${project.id}/reminders`)).body;
+    assert.deepEqual(channels.map((c: { type: string; direct: boolean }) => [c.type, c.direct]), [['slack', false]]);
+    slack.length = 0;
+    const sent = (await call(`/api/tickets/${first.id}/remind`, { body: { note: 'Customers keep asking' } })).body;
+    assert.match(sent.sentTo, /Milton/);
+    assert.match(slack[0], /\*Milton\*, a reminder/);
+    assert.match(slack[0], /Customers keep asking/);
+    assert.match(slack[0], /Sent from Lumora by Lee/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

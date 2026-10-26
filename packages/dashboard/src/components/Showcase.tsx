@@ -183,7 +183,7 @@ function slidesFor(me: Me): Slide[] {
         title: 'Similar reports, one issue',
         body: 'Reports with the same error are grouped, so you see how many people each problem affects and fix the biggest first.',
         scene: <IssuesScene />,
-        cta: { label: 'See issues', href: (p) => `#/p/${p}/reports?view=issues` },
+        cta: { label: 'See issues', href: (p) => `#/p/${p}/reports?mode=issues` },
       },
       {
         id: 'dash',

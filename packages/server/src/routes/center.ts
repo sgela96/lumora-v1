@@ -2,13 +2,21 @@ import { PLANS, type TicketStatus } from '@lumora/shared';
 import express, { Router, type Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { all, one, run } from '../db';
+import { config } from '../config';
+import { getConnector } from '../connectors';
+import type { RemoteStatus } from '../connectors/types';
+import { id as newId } from '../lib/crypto';
 import {
   accountLimits,
   getAccount,
   getOwnedProject,
   HttpError,
+  integrationConfig,
+  PRIORITIES,
   serializeTicket,
+  type Delivery,
   type IntegrationRow,
+  type Priority,
   type ProjectRow,
   type TicketRow,
 } from '../services';
@@ -51,6 +59,23 @@ function filters(req: Request, project: ProjectRow, opts: { ignoreStatus?: boole
       params.push(value);
     }
   }
+  const priority = str(q.priority, 20);
+  if (priority === 'none') where.push('priority IS NULL');
+  else if (PRIORITIES.includes(priority as Priority)) {
+    where.push('priority = ?');
+    params.push(priority);
+  }
+  const assignee = str(q.assignee, 200);
+  if (assignee === 'none') where.push('assignee_name IS NULL');
+  else if (assignee) {
+    where.push('assignee_name = ?');
+    params.push(assignee);
+  }
+  const external = str(q.external, 100);
+  if (external) {
+    where.push('external_status = ?');
+    params.push(external);
+  }
   if (q.delivery === 'failed') where.push("delivery_status = 'failed'");
   if (q.hasRecording === '1') where.push('recording_file IS NOT NULL');
   if (q.hasErrors === '1') where.push('error_count > 0');
@@ -86,7 +111,12 @@ export function centerRouter(): Router {
     const project = getOwnedProject(req.user!.accountId, req.params.id);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const order = req.query.sort === 'oldest' ? 'created_at ASC' : 'created_at DESC';
+    const order =
+      req.query.sort === 'oldest'
+        ? 'created_at ASC'
+        : req.query.sort === 'priority'
+          ? "CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, created_at DESC"
+          : 'created_at DESC';
     const f = filters(req, project);
     const rows = all<TicketRow>(`SELECT * FROM tickets WHERE ${f.sql} ORDER BY ${order} LIMIT ? OFFSET ?`, ...f.params, limit, offset);
     const total = one<{ n: number }>(`SELECT COUNT(*) AS n FROM tickets WHERE ${f.sql}`, ...f.params)!.n;
@@ -106,7 +136,7 @@ export function centerRouter(): Router {
       total,
       items: rows.map((r) => serializeTicket(r)),
       counts: { ...byStatus, all: Object.values(byStatus).reduce((a, b) => a + b, 0) },
-      facets: { category: facet('category'), browser: facet('browser'), page: facet('page_path') },
+      facets: { category: facet('category'), browser: facet('browser'), page: facet('page_path'), assignee: facet('assignee_name'), external: facet('external_status') },
       historyDays: planOf(req).historyDays,
     });
   });
@@ -262,14 +292,96 @@ export function centerRouter(): Router {
 
   // ---------------------------------------------------------- Status
 
-  router.patch('/tickets/:id', (req, res) => {
+  /** The statuses to offer: the connected tool's workflow when there is one, else Lumora's three. */
+  router.get('/projects/:id/workflow', async (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    res.json(await workflowFor(project.id));
+  });
+
+  /** Status, priority or category of one report. A status change goes to the linked tool first. */
+  router.patch('/tickets/:id', async (req, res) => {
     requireSupportCenter(req);
     const ticket = ownedTicket(req);
-    const status = str(req.body.status, 20) as TicketStatus;
-    if (!STATUSES.includes(status)) throw new HttpError(400, 'Invalid status');
-    const resolvedAt = status === 'resolved' ? ticket.resolved_at ?? new Date().toISOString() : null;
-    run('UPDATE tickets SET status = ?, resolved_at = ? WHERE id = ?', status, resolvedAt, ticket.id);
-    res.json(serializeTicket(one<TicketRow>('SELECT * FROM tickets WHERE id = ?', ticket.id)!));
+    await applyPatch(ticket, req.body ?? {});
+    res.json(serializeTicket(one<TicketRow>('SELECT * FROM tickets WHERE id = ?', ticket.id)!, true));
+  });
+
+  /** The same change for several reports (board drag, bulk actions in the list). */
+  router.post('/projects/:id/tickets/bulk', async (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    const ids = Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(String).slice(0, 200) : [];
+    const results: { id: string; ok: boolean; error?: string }[] = [];
+    for (const ticketId of ids) {
+      const ticket = one<TicketRow>('SELECT * FROM tickets WHERE id = ? AND project_id = ?', ticketId, project.id);
+      if (!ticket) continue;
+      try {
+        await applyPatch(ticket, req.body.patch ?? {});
+        results.push({ id: ticketId, ok: true });
+      } catch (error) {
+        results.push({ id: ticketId, ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    res.json({ results });
+  });
+
+  // ---------------------------------------------------------- Saved views
+
+  router.get('/projects/:id/views', (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    res.json(all<{ id: string; name: string; query: string; layout: string }>('SELECT id, name, query, layout FROM saved_views WHERE project_id = ? ORDER BY created_at', project.id).map((v) => ({ ...v, layout: JSON.parse(v.layout) })));
+  });
+
+  router.post('/projects/:id/views', (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    const name = str(req.body?.name, 60);
+    if (!name) throw new HttpError(400, 'Give the view a name');
+    const viewId = newId('vw');
+    run('INSERT INTO saved_views (id, project_id, name, query, layout) VALUES (?, ?, ?, ?, ?)', viewId, project.id, name, str(req.body?.query, 1000), JSON.stringify(req.body?.layout ?? {}).slice(0, 2000));
+    res.status(201).json({ id: viewId, name, query: str(req.body?.query, 1000), layout: req.body?.layout ?? {} });
+  });
+
+  router.delete('/views/:id', (req, res) => {
+    run('DELETE FROM saved_views WHERE id = ? AND project_id IN (SELECT id FROM projects WHERE account_id = ?)', String(req.params.id), req.user!.accountId);
+    res.json({ ok: true });
+  });
+
+  // ---------------------------------------------------------- Reminders
+
+  /** Slack and Teams destinations that can nudge the assignee of a report. */
+  router.get('/projects/:id/reminders', (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    res.json(reminderChannels(project.id).map((i) => ({ integrationId: i.id, type: i.type, name: i.name, direct: i.type === 'slack' && Boolean(integrationConfig(i).botToken) })));
+  });
+
+  /** Sends a reminder about one report: a DM to the assignee when the tool allows it, else a channel post. */
+  router.post('/tickets/:id/remind', async (req, res) => {
+    requireSupportCenter(req);
+    const ticket = ownedTicket(req);
+    const channels = reminderChannels(ticket.project_id);
+    const integration = channels.find((i) => i.id === str(req.body?.integrationId, 60)) ?? channels[0];
+    if (!integration) throw new HttpError(400, 'Connect Slack or Microsoft Teams to send reminders');
+    const linked = (JSON.parse(ticket.deliveries) as Delivery[]).find((d) => d.status === 'sent' && d.url && d.externalId);
+    const assignee = ticket.assignee_name ? { name: ticket.assignee_name, email: ticket.assignee_email } : null;
+    try {
+      const sentTo = await getConnector(integration.type)!.remind!(integrationConfig(integration), {
+        assignee,
+        title: ticket.title,
+        reference: ticket.reference,
+        url: `${config.publicUrl}/app/#/p/${ticket.project_id}/reports/${ticket.id}`,
+        ticketUrl: linked?.url,
+        status: ticket.external_status ?? ticket.status,
+        note: str(req.body?.note, 500) || undefined,
+        from: req.user!.name,
+      });
+      res.json({ ok: true, sentTo, via: integration.name });
+    } catch (error) {
+      throw new HttpError(502, error instanceof Error ? error.message : String(error));
+    }
   });
 
   router.post('/tickets/:id/sync', async (req, res) => {
@@ -319,4 +431,72 @@ function ownedTicket(req: Request): TicketRow {
   );
   if (!row) throw new HttpError(404, 'Ticket not found');
   return row;
+}
+
+function reminderChannels(projectId: string): IntegrationRow[] {
+  return all<IntegrationRow>('SELECT * FROM integrations WHERE project_id = ? AND enabled = 1 ORDER BY created_at', projectId).filter((i) => getConnector(i.type)?.remind);
+}
+
+// ---------------------------------------------------------- Workflow helpers
+
+const workflowCache = new Map<string, { at: number; statuses: RemoteStatus[] }>();
+
+/** The first destination that can list its statuses drives the workflow (usually the only tracker). */
+async function workflowFor(projectId: string) {
+  const integrations = all<IntegrationRow>('SELECT * FROM integrations WHERE project_id = ? AND enabled = 1 ORDER BY created_at', projectId);
+  for (const integration of integrations) {
+    const connector = getConnector(integration.type);
+    if (!connector?.listStatuses) continue;
+    const cached = workflowCache.get(integration.id);
+    let statuses = cached && Date.now() - cached.at < 10 * 60_000 ? cached.statuses : null;
+    if (!statuses) {
+      try {
+        statuses = await connector.listStatuses(integrationConfig(integration));
+        workflowCache.set(integration.id, { at: Date.now(), statuses });
+      } catch (error) {
+        return { source: 'lumora' as const, statuses: LUMORA_STATUSES, error: `Couldn’t read the statuses from ${integration.name}: ${error instanceof Error ? error.message : error}` };
+      }
+    }
+    if (statuses.length) return { source: 'tool' as const, tool: { integrationId: integration.id, type: integration.type, name: integration.name }, statuses };
+  }
+  return { source: 'lumora' as const, statuses: LUMORA_STATUSES };
+}
+
+const LUMORA_STATUSES: RemoteStatus[] = [
+  { name: 'Open', category: 'open' },
+  { name: 'In progress', category: 'in_progress' },
+  { name: 'Resolved', category: 'resolved' },
+];
+
+async function applyPatch(ticket: TicketRow, body: { status?: unknown; externalStatus?: unknown; priority?: unknown; category?: unknown }): Promise<void> {
+  if (body.priority !== undefined) {
+    const priority = body.priority === null || body.priority === 'none' ? null : str(body.priority, 20);
+    if (priority !== null && !PRIORITIES.includes(priority as Priority)) throw new HttpError(400, 'Invalid priority');
+    run('UPDATE tickets SET priority = ? WHERE id = ?', priority, ticket.id);
+  }
+  if (body.category !== undefined) run('UPDATE tickets SET category = ? WHERE id = ?', str(body.category, 60) || null, ticket.id);
+
+  const externalName = str(body.externalStatus, 100);
+  const category = str(body.status, 20) as TicketStatus;
+  if (!externalName && !category) return;
+  if (category && !STATUSES.includes(category)) throw new HttpError(400, 'Invalid status');
+
+  // Linked to a tool that can change status: change it there, then read it back.
+  const workflow = await workflowFor(ticket.project_id);
+  const delivery = (JSON.parse(ticket.deliveries) as Delivery[]).find((d) => workflow.source === 'tool' && d.integrationId === workflow.tool.integrationId && d.status === 'sent' && d.externalId);
+  if (workflow.source === 'tool' && delivery) {
+    const target = externalName ? workflow.statuses.find((s) => s.name === externalName) : workflow.statuses.find((s) => s.category === category);
+    if (!target) throw new HttpError(400, `${workflow.tool.name} has no status called “${externalName || category}”`);
+    const integration = one<IntegrationRow>('SELECT * FROM integrations WHERE id = ?', delivery.integrationId)!;
+    try {
+      await getConnector(integration.type)!.setStatus!(integrationConfig(integration), delivery.externalId!, target);
+    } catch (error) {
+      throw new HttpError(502, error instanceof Error ? error.message : String(error));
+    }
+    await syncTicket(ticket.id);
+    return;
+  }
+  const status = category || workflow.statuses.find((s) => s.name === externalName)?.category || 'open';
+  const resolvedAt = status === 'resolved' ? ticket.resolved_at ?? new Date().toISOString() : null;
+  run('UPDATE tickets SET status = ?, resolved_at = ?, external_status = ? WHERE id = ?', status, resolvedAt, externalName && workflow.source === 'tool' ? externalName : null, ticket.id);
 }

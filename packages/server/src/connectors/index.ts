@@ -1,5 +1,5 @@
 import { INTEGRATION_CATEGORIES, type IntegrationCategory, type IntegrationType } from '@lumora/shared';
-import { email, slack, webhook } from './basic';
+import { email, slack, teams, webhook } from './basic';
 import { freshservice, hubspot, servicenow } from './enterprise';
 import { freshdesk, github, jira, linear, salesforce, zendesk } from './helpdesks';
 import { asana, azureDevops, clickup, gitlab, shortcut, trello, youtrack } from './trackers';
@@ -8,6 +8,7 @@ import type { Connector } from './types';
 export const CONNECTORS: Record<IntegrationType, Connector> = {
   webhook,
   slack,
+  teams,
   email,
   jira,
   azure_devops: azureDevops,

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { minimumPlanFor, type PlanLimits, type ProjectSettings } from '@lumora/shared';
-import { api, type Catalog, type Me, type Project } from './api';
+import { api, type Catalog, type Me, type Project, type Workflow } from './api';
 
 interface AppState {
   me: Me;
@@ -103,4 +103,26 @@ export function useHashQuery(): [URLSearchParams, (next: Record<string, string |
     setHash(location.hash);
   };
   return [params, update];
+}
+
+const workflows = new Map<string, Promise<Workflow>>();
+
+/** The statuses to offer for a project (the connected tool's workflow, or Lumora's three). Shared across pages. */
+export function useWorkflow(projectId: string, enabled = true): Workflow | null {
+  const [workflow, setWorkflow] = useState<Workflow | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let promise = workflows.get(projectId);
+    if (!promise) {
+      promise = api<Workflow>(`/projects/${projectId}/workflow`);
+      workflows.set(projectId, promise);
+      promise.catch(() => workflows.delete(projectId));
+    }
+    let live = true;
+    promise.then((w) => live && setWorkflow(w), () => {});
+    return () => {
+      live = false;
+    };
+  }, [projectId, enabled]);
+  return workflow;
 }

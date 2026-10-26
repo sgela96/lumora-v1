@@ -1,9 +1,9 @@
-import { formatOffset, type TicketStatus } from '@lumora/shared';
+import { formatOffset } from '@lumora/shared';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type Project, type TicketDetail } from '../api';
+import { api, type Priority, type Project, type ReminderChannel, type RemoteStatus, type TicketDetail } from '../api';
 import { Icons, LogoTile } from '../components/icons';
-import { Card, CopyButton, Segmented, StatusBadge, StatusPicker, timeAgo, useToast } from '../components/ui';
-import { useApp } from '../state';
+import { Avatar, Card, CopyButton, PriorityPicker, StatusPicker, timeAgo, useDismiss, useToast } from '../components/ui';
+import { useApp, useWorkflow } from '../state';
 
 export function TicketPage({ project, ticketId }: { project: Project; ticketId: string }) {
   const { me } = useApp();
@@ -13,6 +13,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
   const [tab, setTab] = useState<'overview' | 'console' | 'network' | 'ticket'>('overview');
   const [busy, setBusy] = useState<'' | 'resend' | 'sync'>('');
   const toast = useToast();
+  const workflow = useWorkflow(project.id, supportCenter);
 
   const load = useCallback(() => api<TicketDetail>(`/tickets/${ticketId}`).then(setTicket, (e) => setError(e.message)), [ticketId]);
   useEffect(() => {
@@ -44,15 +45,17 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
     }
   };
 
-  const setStatus = async (status: TicketStatus) => {
+  const patch = async (body: object, done: string) => {
     try {
-      await api(`/tickets/${ticket.id}`, { method: 'PATCH', body: { status } });
-      await load();
-      toast('Status updated');
+      setTicket(await api<TicketDetail>(`/tickets/${ticket.id}`, { method: 'PATCH', body }));
+      toast(done);
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), true);
     }
   };
+  const setStatus = (s: RemoteStatus) =>
+    patch(workflow?.source === 'tool' ? { externalStatus: s.name } : { status: s.category }, workflow?.source === 'tool' ? `Moved to “${s.name}” in ${workflow.tool!.name}` : 'Status updated');
+  const setPriority = (priority: Priority | null) => patch({ priority: priority ?? 'none' }, 'Priority updated');
 
   return (
     <div className="stack">
@@ -67,7 +70,6 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
             <span className="mono">{ticket.reference}</span>
             <span>·</span>
             <span>{timeAgo(ticket.createdAt)}</span>
-            {supportCenter && <StatusBadge status={ticket.status} label={ticket.externalStatus} />}
           </div>
         </div>
         <div className="row">
@@ -89,26 +91,43 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
           </a>
         </div>
       ) : (
-      <div className="card card-pad spread" style={{ flexWrap: 'wrap' }}>
-        <div className="stack-sm" style={{ gap: 4 }}>
-          <strong>Status</strong>
+      <section className="card triage">
+        <div className="triage-cell">
+          <span className="label">Status</span>
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            <StatusPicker value={ticket.status} label={ticket.externalStatus} statuses={workflow?.statuses} onChange={setStatus} align="left" />
+            {linkedSyncs && (
+              <button className="btn btn-sm btn-ghost btn-icon" onClick={() => run('sync')} disabled={!!busy} title="Read the status from the linked ticket now" aria-label="Sync status">
+                <Icons.sync size={14} />
+              </button>
+            )}
+          </div>
           <span className="muted small">
-            {synced
-              ? `Synced from ${synced.name} · “${synced.external!.label}” · ${timeAgo(synced.external!.syncedAt)}`
-              : linkedSyncs && !supportCenter
-                ? 'Status sync with your ticketing tool is part of the Business plan.'
-                : 'Set manually — no linked ticket reports a status.'}
+            {synced ? `From ${synced.name} · ${timeAgo(synced.external!.syncedAt)}` : workflow?.source === 'tool' ? `${workflow.tool!.name} workflow` : 'Set in Lumora'}
           </span>
         </div>
-        <div className="row">
-          <StatusPicker value={ticket.status} onChange={setStatus} />
-          {supportCenter && linkedSyncs && (
-            <button className="btn btn-sm" onClick={() => run('sync')} disabled={!!busy} title="Read the status from the linked ticket now">
-              <Icons.sync size={14} /> {busy === 'sync' ? 'Syncing…' : 'Sync'}
-            </button>
-          )}
+        <div className="triage-cell">
+          <span className="label">Priority</span>
+          <PriorityPicker value={ticket.priority} onChange={setPriority} align="left" />
+          <span className="muted small">{ticket.ai && ticket.priority === ticket.ai.priority ? 'Suggested by AI Powered' : ticket.priority ? 'Set by your team' : 'Not set yet'}</span>
         </div>
-      </div>
+        <div className="triage-cell">
+          <span className="label">Assignee</span>
+          <span className="row" style={{ gap: 8, flexWrap: 'nowrap', minHeight: 30 }}>
+            {ticket.assignee ? (
+              <>
+                <Avatar name={ticket.assignee.name} /> <strong className="ellipsis">{ticket.assignee.name}</strong>
+              </>
+            ) : (
+              <span className="muted">Unassigned</span>
+            )}
+          </span>
+          <span className="muted small">{synced ? `Assigned in ${synced.name}` : 'Assign it in your ticketing tool'}</span>
+        </div>
+        <div className="triage-cell triage-action">
+          <RemindButton ticketId={ticket.id} projectId={project.id} assignee={ticket.assignee?.name ?? null} />
+        </div>
+      </section>
       )}
 
       {ticket.ai && (
@@ -374,6 +393,84 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
         <Card title="Description sent to your tools" actions={<CopyButton text={ticket.description} />}>
           <div className="markdown mono">{ticket.description}</div>
         </Card>
+      )}
+    </div>
+  );
+}
+
+/** Nudges the assignee on Slack or Teams: a direct message when Slack has a bot token, else a channel post. */
+function RemindButton({ ticketId, projectId, assignee }: { ticketId: string; projectId: string; assignee: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [channels, setChannels] = useState<ReminderChannel[] | null>(null);
+  const [channel, setChannel] = useState('');
+  const [note, setNote] = useState('');
+  const [sending, setSending] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  const toast = useToast();
+
+  useEffect(() => {
+    if (open && !channels)
+      api<ReminderChannel[]>(`/projects/${projectId}/reminders`).then((c) => {
+        setChannels(c);
+        setChannel(c[0]?.integrationId ?? '');
+      });
+  }, [open]);
+
+  const selected = channels?.find((c) => c.integrationId === channel);
+  const send = async () => {
+    setSending(true);
+    try {
+      const r = await api<{ sentTo: string }>(`/tickets/${ticketId}/remind`, { body: { integrationId: channel, note } });
+      toast(r.sentTo);
+      setOpen(false);
+      setNote('');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), true);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="status-picker" ref={ref}>
+      <button className="btn btn-sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icons.bell size={14} /> Send a reminder
+      </button>
+      {open && (
+        <div className="status-menu card remind-pop align-right">
+          {!channels ? (
+            <p className="muted small">Loading…</p>
+          ) : channels.length === 0 ? (
+            <div className="stack-sm">
+              <strong>Remind on Slack or Teams</strong>
+              <p className="muted small">Connect Slack or Microsoft Teams to nudge whoever has this report.</p>
+              <a className="btn btn-sm btn-primary" href={`#/p/${projectId}/settings/integrations`} style={{ textDecoration: 'none', alignSelf: 'start' }}>
+                Connect
+              </a>
+            </div>
+          ) : (
+            <div className="stack-sm">
+              <strong>{assignee ? `Remind ${assignee}` : 'Remind the team'}</strong>
+              {channels.length > 1 && (
+                <select className="select" aria-label="Send with" value={channel} onChange={(e) => setChannel(e.target.value)}>
+                  {channels.map((c) => (
+                    <option key={c.integrationId} value={c.integrationId}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <span className="row small muted" style={{ gap: 8, flexWrap: 'nowrap' }}>
+                {selected && <LogoTile type={selected.type} />}
+                {selected?.direct && assignee ? `A direct message on ${selected.name}` : `A post in the ${selected?.name ?? ''} channel${assignee ? ` mentioning ${assignee}` : ''}`}
+              </span>
+              <textarea className="input" rows={3} placeholder="Add a note (optional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
+              <button className="btn btn-primary btn-sm" onClick={send} disabled={sending} style={{ alignSelf: 'end' }}>
+                {sending ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

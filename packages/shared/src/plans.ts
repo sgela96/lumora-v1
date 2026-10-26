@@ -4,6 +4,7 @@ export type IntegrationType =
   // Messaging & generic
   | 'webhook'
   | 'slack'
+  | 'teams'
   | 'email'
   // Issue / defect trackers
   | 'jira'
@@ -34,7 +35,7 @@ export const INTEGRATION_CATEGORIES: Record<IntegrationCategory, { label: string
   },
   helpdesks: { label: 'Help desks', types: ['zendesk', 'freshdesk', 'hubspot'] },
   enterprise: { label: 'Enterprise service management', types: ['salesforce', 'servicenow', 'freshservice'] },
-  messaging: { label: 'Messaging & automation', types: ['webhook', 'slack', 'email'] },
+  messaging: { label: 'Messaging & automation', types: ['webhook', 'slack', 'teams', 'email'] },
 };
 
 /** Workflow status of a report, synced from the linked ticket when there is one. */

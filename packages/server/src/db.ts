@@ -156,6 +156,21 @@ const MIGRATIONS: Migration[] = [
   UPDATE projects SET first_report_at = (SELECT MIN(created_at) FROM tickets t WHERE t.project_id = projects.id);
   UPDATE accounts SET onboarding = '{"setupDone":true,"tourDone":true}';
   `,
+  // Support Center 2: priority, the assignee from the linked tool, saved views.
+  /* sql */ `
+  ALTER TABLE tickets ADD COLUMN priority TEXT;
+  ALTER TABLE tickets ADD COLUMN assignee_name TEXT;
+  ALTER TABLE tickets ADD COLUMN assignee_email TEXT;
+  UPDATE tickets SET priority = json_extract(ai_data, '$.priority') WHERE ai_data IS NOT NULL;
+  CREATE TABLE saved_views (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    query TEXT NOT NULL,
+    layout TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  `,
 ];
 
 export function getDb(): DatabaseSync {
