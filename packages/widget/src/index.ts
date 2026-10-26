@@ -46,8 +46,12 @@ const VERSION = '0.1.0';
   let widget: Widget | undefined;
   const pending: QueuedCall[] = [...(existing?.q ?? [])];
 
-  const host = document.createElement('lumora-widget');
-  host.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; top: 0; left: 0; width: 0; height: 0;';
+  const newHost = () => {
+    const el = document.createElement('lumora-widget');
+    el.style.cssText = 'all: initial; position: fixed; z-index: 2147483647; top: 0; left: 0; width: 0; height: 0;';
+    return el;
+  };
+  let host = newHost();
   const isOwnElement = (node: Node) => node === host || host.contains(node);
 
   // Start capturing immediately so errors before the widget opens are not lost.
@@ -117,10 +121,10 @@ const VERSION = '0.1.0';
       const c = config.settings.capture;
       actions.options.maskInputs = c.maskInputs;
       actions.options.redactSelectors = c.redactSelectors;
-      const mount = () => {
+      const mount = (current = config) => {
         (document.body ?? document.documentElement).append(host);
         widget = new Widget({
-          config,
+          config: current,
           api,
           console: consoleCapture,
           network,
@@ -131,7 +135,21 @@ const VERSION = '0.1.0';
         });
         for (const call of pending.splice(0)) run(call);
       };
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });
+      // The back office's live preview (the demo page opened with ?preview=1) sends unsaved settings
+      // so changes show before they are saved. Only the Lumora origin itself can do this.
+      if (new URLSearchParams(location.search).get('preview') === '1') {
+        window.addEventListener('message', (event) => {
+          const data = event.data as { type?: string; settings?: typeof config.settings; open?: boolean } | null;
+          if (event.origin !== new URL(apiBase).origin || data?.type !== 'lumora:preview' || !data.settings) return;
+          const wasOpen = !!host.shadowRoot?.querySelector('.lu-panel:not([hidden])');
+          widget?.destroy();
+          host = newHost();
+          mount({ ...config, settings: data.settings });
+          if (data.open ?? wasOpen) widget?.open();
+        });
+        window.parent?.postMessage({ type: 'lumora:preview-ready' }, new URL(apiBase).origin);
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => mount(), { once: true });
       else mount();
     })
     .catch((error) => console.warn(`[Lumora] Widget disabled: ${error instanceof Error ? error.message : error}`));

@@ -100,7 +100,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     reportsPerMonth: 25,
     aiReportsPerMonth: 0,
     destinationsPerProject: 1,
-    historyDays: 0,
+    historyDays: 30,
     integrations: [...FREE_TRACKERS, ...MESSAGING],
     features: {
       screenshot: true,
@@ -133,7 +133,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     reportsPerMonth: 500,
     aiReportsPerMonth: 0,
     destinationsPerProject: 1,
-    historyDays: 30,
+    historyDays: 90,
     integrations: [...TRACKERS, ...MESSAGING],
     features: {
       screenshot: true,

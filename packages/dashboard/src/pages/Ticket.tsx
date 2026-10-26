@@ -2,7 +2,7 @@ import { formatOffset, type TicketStatus } from '@lumora/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { api, type Project, type TicketDetail } from '../api';
 import { Icons, LogoTile } from '../components/icons';
-import { Card, CopyButton, Segmented, StatusBadge, timeAgo, useToast } from '../components/ui';
+import { Card, CopyButton, Segmented, StatusBadge, StatusPicker, timeAgo, useToast } from '../components/ui';
 import { useApp } from '../state';
 
 export function TicketPage({ project, ticketId }: { project: Project; ticketId: string }) {
@@ -45,8 +45,13 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
   };
 
   const setStatus = async (status: TicketStatus) => {
-    await api(`/tickets/${ticket.id}`, { method: 'PATCH', body: { status } });
-    load();
+    try {
+      await api(`/tickets/${ticket.id}`, { method: 'PATCH', body: { status } });
+      await load();
+      toast('Status updated');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), true);
+    }
   };
 
   return (
@@ -62,7 +67,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
             <span className="mono">{ticket.reference}</span>
             <span>·</span>
             <span>{timeAgo(ticket.createdAt)}</span>
-            <StatusBadge status={ticket.status} label={ticket.externalStatus} />
+            {supportCenter && <StatusBadge status={ticket.status} label={ticket.externalStatus} />}
           </div>
         </div>
         <div className="row">
@@ -72,6 +77,18 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
         </div>
       </div>
 
+      {!supportCenter ? (
+        <div className="notice spread" style={{ gap: 12, flexWrap: 'wrap' }}>
+          <span>
+            {ticket.deliveries.some((d) => d.status === 'sent')
+              ? 'Sent to your tool. Business tracks its status here, synced from the linked ticket.'
+              : 'Business adds a status to every report, synced from Jira, Zendesk and more.'}
+          </span>
+          <a className="btn btn-sm" href="#/billing" style={{ textDecoration: 'none' }}>
+            See Business
+          </a>
+        </div>
+      ) : (
       <div className="card card-pad spread" style={{ flexWrap: 'wrap' }}>
         <div className="stack-sm" style={{ gap: 4 }}>
           <strong>Status</strong>
@@ -84,16 +101,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
           </span>
         </div>
         <div className="row">
-          <Segmented
-            label="Status"
-            value={ticket.status}
-            onChange={setStatus}
-            options={[
-              { value: 'open', label: 'Open' },
-              { value: 'in_progress', label: 'In progress' },
-              { value: 'resolved', label: 'Resolved' },
-            ]}
-          />
+          <StatusPicker value={ticket.status} onChange={setStatus} />
           {supportCenter && linkedSyncs && (
             <button className="btn btn-sm" onClick={() => run('sync')} disabled={!!busy} title="Read the status from the linked ticket now">
               <Icons.sync size={14} /> {busy === 'sync' ? 'Syncing…' : 'Sync'}
@@ -101,6 +109,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
           )}
         </div>
       </div>
+      )}
 
       {ticket.ai && (
         <section className="card card-pad ai-card iris-border">
@@ -313,7 +322,11 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
               ))}
             </div>
           ) : (
-            <p className="muted">Nothing was logged.</p>
+            <p className="muted">
+              {p.console
+                ? 'No errors or warnings were logged before this report. The page was quiet, so the problem is probably visual or in the flow.'
+                : 'Console capture was off for this report. Turn it on in Settings → Data capture.'}
+            </p>
           )}
         </Card>
       )}
@@ -346,7 +359,13 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
               </table>
             </div>
           ) : (
-            <p className="muted card-pad">No failed requests.</p>
+            <p className="muted card-pad">
+              {p.network
+                ? 'No requests failed before this report. Lumora keeps failed requests by default; you can record every request in Settings → Data capture.'
+                : me.limits.features.network
+                  ? 'Network capture was off for this report. Turn it on in Settings → Data capture.'
+                  : 'Failed requests are attached on Pro and Business.'}
+            </p>
           )}
         </Card>
       )}

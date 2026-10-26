@@ -4,3 +4,4 @@ export * from './defaults';
 export * from './steps';
 export * from './redact';
 export * from './nebula';
+export * from './validate';

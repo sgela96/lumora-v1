@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import { NEBULA_CSS, nebulaSvg, PLANS, type PlanId, type TicketStatus } from '@lumora/shared';
 import { Icons } from './icons';
 
@@ -49,6 +49,7 @@ export function ToggleRow({
   onChange,
   lockedTo,
   lockLabel,
+  tier,
   children,
 }: {
   title: string;
@@ -59,6 +60,8 @@ export function ToggleRow({
   lockedTo?: PlanId;
   /** Badge text when the feature is unlocked by an extra rather than a plan. */
   lockLabel?: string;
+  /** The plan this feature belongs to; labelled even after upgrading. */
+  tier?: PlanId;
   children?: ReactNode;
 }) {
   return (
@@ -66,7 +69,7 @@ export function ToggleRow({
       <div className="text">
         <div className="row" style={{ gap: 8 }}>
           <strong>{title}</strong>
-          {lockedTo && <UpgradeBadge plan={lockedTo} label={lockLabel} />}
+          {lockedTo ? <UpgradeBadge plan={lockedTo} label={lockLabel} /> : tier && tier !== 'free' && <TierBadge plan={tier} />}
         </div>
         {description && <span className="hint">{description}</span>}
         {children && checked && !lockedTo && <div style={{ marginTop: 10 }}>{children}</div>}
@@ -81,6 +84,15 @@ export function UpgradeBadge({ plan, label }: { plan: PlanId; label?: string }) 
     <a href="#/billing" className="badge badge-accent" style={{ textDecoration: 'none' }} title={label ?? `Available on ${PLANS[plan].name}`}>
       {label ?? PLANS[plan].name}
     </a>
+  );
+}
+
+/** The plan a feature belongs to, shown even when the current plan includes it, so paid features stay easy to spot. */
+export function TierBadge({ plan }: { plan: PlanId }) {
+  return (
+    <span className={`badge tier-badge tier-${plan}`} title={`${PLANS[plan].name} feature`}>
+      {PLANS[plan].name}
+    </span>
   );
 }
 
@@ -155,6 +167,59 @@ export function StatusBadge({ status, label }: { status: TicketStatus; label?: s
 }
 
 export const statusLabel = (s: TicketStatus) => STATUS_META[s].label;
+
+/** A status pick list: the current status as a pill that opens the list of statuses. */
+export function StatusPicker({ value, onChange, disabled }: { value: TicketStatus; onChange: (s: TicketStatus) => void | Promise<void>; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  const pick = async (s: TicketStatus) => {
+    setOpen(false);
+    if (s === value) return;
+    setBusy(true);
+    try {
+      await onChange(s);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const meta = STATUS_META[value] ?? STATUS_META.open;
+  return (
+    <div className="status-picker" ref={ref}>
+      <button type="button" className={`status-trigger badge ${meta.cls}`} aria-haspopup="listbox" aria-expanded={open} disabled={disabled || busy} onClick={() => setOpen(!open)}>
+        <span className={meta.dot} aria-hidden />
+        {busy ? 'Saving…' : meta.label}
+        <Icons.chevronDown size={13} />
+      </button>
+      {open && (
+        <ul className="status-menu card" role="listbox" aria-label="Status">
+          {(Object.keys(STATUS_META) as TicketStatus[]).map((s) => (
+            <li key={s} role="option" aria-selected={s === value}>
+              <button type="button" onClick={() => pick(s)}>
+                <span className={`badge ${STATUS_META[s].cls}`}>
+                  <span className={STATUS_META[s].dot} aria-hidden />
+                  {STATUS_META[s].label}
+                </span>
+                {s === value && <Icons.check size={14} />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);

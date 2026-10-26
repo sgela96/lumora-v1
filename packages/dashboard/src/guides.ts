@@ -83,8 +83,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     title: 'The widget doesn’t show up',
     body: [
       'Open your browser console: Lumora prints a warning starting with [Lumora] that says why.',
-      '“This site is not allowed”: add your domain in Settings → General → Allowed domains (or leave the list empty).',
-      'Check the data-key in the snippet matches the one in Settings → General.',
+      '“This site is not allowed”: add your domain in Settings → App → Allowed domains (or leave the list empty).',
+      'Check the data-key in the snippet matches the one in Settings → App.',
       'A strict Content-Security-Policy must allow the Lumora script and API domain.',
     ],
   },

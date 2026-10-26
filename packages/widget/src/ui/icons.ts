@@ -22,6 +22,7 @@ export const icons = {
   plus: svg('<path d="M12 5v14M5 12h14"/>', 18),
   square: svg('<rect x="4" y="4" width="16" height="16" rx="2"/>', 16),
   eyeOff: svg('<path d="M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a17 17 0 0 1-2.2 3.4M6.6 6.6A17 17 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20"/>', 16),
+  type: svg('<path d="M4 7V5h16v2M9 19h6M12 5v14"/>', 16),
   undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>', 16),
   mic: svg('<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>', 14),
 };

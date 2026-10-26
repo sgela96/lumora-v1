@@ -713,7 +713,19 @@ export class Widget {
       onEnd?.();
     };
     if (reduced) return done();
-    node.addEventListener('animationend', (e) => e.target === node && done(), { once: true });
+    // Children animate too (countdown bar, sparks) and their animationend bubbles up here, so
+    // listen until our own animation ends, with a timer in case the event never arrives.
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      node.removeEventListener('animationend', onOwnEnd);
+      window.clearTimeout(timer);
+      done();
+    };
+    const onOwnEnd = (e: Event) => e.target === node && finish();
+    node.addEventListener('animationend', onOwnEnd);
+    const timer = window.setTimeout(finish, 1500);
   }
 
   /** A large nebula for the sending / thank-you states. */

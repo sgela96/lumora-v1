@@ -8,8 +8,7 @@ import {
   mergeSettings,
   PLANS,
   TEMPLATE_VARIABLES,
-  type ProjectSettings,
-} from '@lumora/shared';
+  type ProjectSettings, formatError } from '@lumora/shared';
 import { Router, type Request, type Response } from 'express';
 import { endSession, requireJsonForMutations, requireUser, startSession } from '../auth';
 import { config } from '../config';
@@ -333,9 +332,8 @@ export function appRouter(): Router {
   router.use(centerRouter());
 
   router.get('/tickets/:id', (req, res) => {
-    const ticket = ownedTicket(req);
-    if (!accountLimits(getAccount(req.user!.accountId)).features.supportCenter) throw new HttpError(402, 'The report repository is part of Business', 'upgrade');
-    res.json(serializeTicket(ticket, true));
+    // Every plan can open its reports; status tracking and grouping stay in the Support Center.
+    res.json(serializeTicket(ownedTicket(req), true));
   });
 
   router.post('/tickets/:id/resend', async (req, res) => {
@@ -424,6 +422,8 @@ function cleanConfig(type: string, input: unknown, previous: Record<string, stri
     // "••••" means "unchanged" for secrets the dashboard never received.
     out[field.key] = field.type === 'password' && (value === '' || /^•+$/.test(value)) ? (previous[field.key] ?? '') : value;
     if (field.required && !out[field.key]) throw new HttpError(400, `${field.label} is required`);
+    const bad = formatError(field.type, out[field.key], field.label);
+    if (bad) throw new HttpError(400, bad);
   }
   return out;
 }

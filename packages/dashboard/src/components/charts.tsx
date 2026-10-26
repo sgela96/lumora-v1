@@ -184,7 +184,8 @@ function longDate(day: string): string {
 
 /** Tiny trend line for KPI tiles (decorative; the number beside it carries the value). */
 export function Sparkline({ values, color = '--series-reports' }: { values: number[]; color?: string }) {
-  if (values.length < 2) return null;
+  // With almost no data a sparkline is just a lone spike; it says nothing, so it isn't drawn.
+  if (values.length < 2 || values.filter((v) => v > 0).length < 3) return null;
   const w = 96;
   const h = 34;
   const max = Math.max(1, ...values);
@@ -203,16 +204,19 @@ export function Sparkline({ values, color = '--series-reports' }: { values: numb
   );
 }
 
-/** Animates a number from 0 to its value on first render (respects reduced motion). */
+/** Animates a number up to its value: from 0 on first render, then from the previous value (respects reduced motion). */
 export function useCountUp(target: number, ms = 900): number {
   const [value, setValue] = useState(0);
+  const from = useRef(0);
   useEffect(() => {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return setValue(target);
     let frame = 0;
     const start = performance.now();
+    const origin = from.current;
+    from.current = target;
     const tick = (now: number) => {
       const t = Math.min(1, (now - start) / ms);
-      setValue(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      setValue(Math.round(origin + (target - origin) * (1 - Math.pow(1 - t, 3))));
       if (t < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

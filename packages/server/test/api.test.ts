@@ -55,7 +55,9 @@ test('register → project → widget config → report → ticket', async () =>
   assert.equal((await call('/api/billing/trial', { body: {} })).status, 200);
   const [firstProject] = (await call('/api/projects')).body;
   assert.equal((await call(`/api/projects/${firstProject.id}/metrics`)).body.level, 'basic');
-  assert.equal((await call(`/api/projects/${firstProject.id}/tickets`)).status, 402);
+  // Pro lists and opens its reports; statuses, filters and grouping are Business.
+  assert.equal((await call(`/api/projects/${firstProject.id}/tickets`)).status, 200);
+  assert.equal((await call(`/api/projects/${firstProject.id}/issues`)).status, 402);
   assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'business' } })).status, 200);
 
   const [project] = (await call('/api/projects')).body;
@@ -350,6 +352,7 @@ test('new accounts start on Free and can opt into one 7-day Pro trial', async ()
   assert.equal(me.account.trialEndsAt, null);
   assert.ok(me.limits.integrations.includes('jira'), 'Free can connect Jira');
   assert.ok(!me.limits.integrations.includes('azure_devops'));
+  assert.equal(me.limits.historyDays, 30, 'Free keeps a month of reports');
 
   const started = await call('/api/billing/trial', { body: {} });
   assert.equal(started.status, 200);

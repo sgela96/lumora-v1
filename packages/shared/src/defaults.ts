@@ -130,6 +130,8 @@ export function mergeSettings(stored: unknown): ProjectSettings {
 export function clampSettingsToPlan(settings: ProjectSettings, plan: PlanId | PlanLimits): ProjectSettings {
   const f = (typeof plan === 'string' ? PLANS[plan] : plan).features;
   const s: ProjectSettings = structuredClone(settings);
+  // The nebula is always Lumora's pastel yellow; it is the brand, not a setting.
+  s.appearance.accentColor = NEBULA_DEFAULT_ACCENT;
 
   s.reportTypes.recording = s.reportTypes.recording && f.recording;
   s.reportTypes.screenshot = s.reportTypes.screenshot && f.screenshot;

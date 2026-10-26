@@ -16,7 +16,7 @@ export function InstallPage({ project }: { project: Project }) {
   const api = `Lumora('open');        // open the panel
 Lumora('screenshot');  // jump straight to a screenshot
 Lumora('record');      // start a screen recording
-Lumora('hide');        // hide the floating sun (e.g. on checkout)
+Lumora('hide');        // hide the nebula (e.g. on checkout)
 Lumora('show');`;
   const gtm = `<script>
   (function () {
@@ -52,7 +52,7 @@ Lumora('show');`;
             {project.allowedOrigins.length === 0 && (
               <>
                 {' '}
-                <strong>Tip:</strong> restrict which domains can use this key in <a href={`#/p/${project.id}/settings/general`}>General</a>.
+                <strong>Tip:</strong> restrict which domains can use this key in <a href={`#/p/${project.id}/settings/general`}>Settings → App</a>.
               </>
             )}
           </p>

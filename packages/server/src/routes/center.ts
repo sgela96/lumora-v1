@@ -30,7 +30,8 @@ function filters(req: Request, project: ProjectRow, opts: { ignoreStatus?: boole
   const plan = planOf(req);
   const where: string[] = ['project_id = ?', 'created_at >= ?'];
   const params: (string | number)[] = [project.id, sqlDate(new Date(Date.now() - plan.historyDays * 86400_000))];
-  const q = req.query;
+  // Free and Pro get the plain list (search only); status, filters and grouping are the Support Center.
+  const q: Request['query'] = plan.features.supportCenter ? req.query : { q: req.query.q };
 
   const status = str(q.status, 20);
   if (!opts.ignoreStatus && STATUSES.includes(status as TicketStatus)) {
@@ -82,7 +83,6 @@ export function centerRouter(): Router {
   // ---------------------------------------------------------- Report repository
 
   router.get('/projects/:id/tickets', (req, res) => {
-    requireSupportCenter(req);
     const project = getOwnedProject(req.user!.accountId, req.params.id);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -263,6 +263,7 @@ export function centerRouter(): Router {
   // ---------------------------------------------------------- Status
 
   router.patch('/tickets/:id', (req, res) => {
+    requireSupportCenter(req);
     const ticket = ownedTicket(req);
     const status = str(req.body.status, 20) as TicketStatus;
     if (!STATUSES.includes(status)) throw new HttpError(400, 'Invalid status');
