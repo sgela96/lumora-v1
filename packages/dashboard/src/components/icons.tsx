@@ -17,6 +17,48 @@ export const Icons = {
       <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
     </Icon>
   ),
+  grip: (p: P) => (
+    <Icon {...p}>
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
+    </Icon>
+  ),
+  chevronUp: (p: P) => (
+    <Icon {...p}>
+      <path d="m6 15 6-6 6 6" />
+    </Icon>
+  ),
+  x: (p: P) => (
+    <Icon {...p}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </Icon>
+  ),
+  plus: (p: P) => (
+    <Icon {...p}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  ),
+  code: (p: P) => (
+    <Icon {...p}>
+      <path d="m8 9-4 3 4 3M16 9l4 3-4 3M13 6l-2 12" />
+    </Icon>
+  ),
+  user: (p: P) => (
+    <Icon {...p}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c.9-3.5 3.6-5.5 7-5.5s6.1 2 7 5.5" />
+    </Icon>
+  ),
+  globe: (p: P) => (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </Icon>
+  ),
   chevronDown: (p: P) => (
     <Icon {...p}>
       <path d="m6 9 6 6 6-6" />
