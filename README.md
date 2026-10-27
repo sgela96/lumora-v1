@@ -27,6 +27,10 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 | **Demo** (`demo/`) | App falsa con botones para romper cosas, para probar el widget. |
 | **Web** (`site/`) | Sitio de marketing en `/`: hero con la nebulosa, producto, cómo funciona, AI Powered, integraciones, Support Center, precios y registro (lleva nombre, e-mail y empresa al alta en `/app/#/register`). Un solo HTML estático, sin build. |
 
+### Dashboard personalizable (Pro y Business)
+
+El Overview se arma con tarjetas. El dueño de la cuenta (quien la creó) toca el engranaje, arrastra, cambia tamaños (S, M, L), saca y agrega tarjetas desde una galería con vista previa con datos reales, o parte de un preset (Essentials, Product, Support, Engineering). Hay **un solo layout por organización**: todo el equipo ve lo mismo y solo el dueño lo edita (`PUT /api/account/dashboard`). Las tarjetas de Business (abiertos, tiempo de resolución, top issues, personas afectadas, por estado del tool, por asignado, por prioridad, antigüedad y errores que vio la gente en pantalla) aparecen con candado en Pro. Catálogo y presets en `packages/shared/src/dashboard.ts`.
+
 ### Support Center (Business)
 
 - **Overview**: reportes del período y variación, abiertos ahora, tiempo mediano de resolución, % con errores, gráfico diario de reportes vs. resueltos (con tooltip y vista de tabla), top issues, páginas donde la gente se traba, categorías, navegadores y forma de reporte. Los gráficos usan una paleta validada para daltonismo y contraste, en claro y oscuro.

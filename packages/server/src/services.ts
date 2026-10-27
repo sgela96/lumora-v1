@@ -37,7 +37,15 @@ export interface AccountRow {
   addons: string;
   /** JSON OnboardingState */
   onboarding: string;
+  /** JSON DashboardItem[]; null until the owner customizes the Overview. */
+  dashboard_layout: string | null;
   created_at: string;
+}
+
+/** The person who created the account: the only one who can change organization-wide settings like the dashboard. */
+export function isAccountOwner(accountId: string, userId: string): boolean {
+  const owner = one<{ id: string }>('SELECT id FROM users WHERE account_id = ? ORDER BY created_at, rowid LIMIT 1', accountId);
+  return owner?.id === userId;
 }
 
 export function getAccount(accountId: string): AccountRow {

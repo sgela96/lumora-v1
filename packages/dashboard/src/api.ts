@@ -1,4 +1,4 @@
-import type { Addon, AddonId, AddonQuantities, IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
+import type { Addon, AddonId, DashboardItem, AddonQuantities, IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -37,6 +37,8 @@ export interface Me {
     hasBillingCustomer: boolean;
   };
   limits: PlanLimits;
+  /** The organization's Overview layout; only the account owner can change it. */
+  dashboard: { layout: DashboardItem[]; custom: boolean; canEdit: boolean };
   usage: { month: string; reports: number; aiReports: number };
   server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; transcriptionAvailable: boolean; emailAvailable: boolean; supportEmail: string };
 }
@@ -215,19 +217,39 @@ export interface RecentReport {
   linked: { type: string; ref: string | null; url: string | null } | null;
 }
 
-export interface BasicMetrics {
-  level: 'basic';
-  days: number;
-  totals: { reports: number; previous: number; withRecording: number; withErrors: number };
-  series: { day: string; created: number }[];
-  byCategory: { label: string; value: number }[];
-  recent: RecentReport[];
+export interface Breakdown {
+  label: string;
+  value: number;
 }
 
-export interface Metrics {
-  level: 'advanced';
+interface MetricsBase {
   days: number;
   recent: RecentReport[];
+  byCategory: Breakdown[];
+  byKind: Breakdown[];
+  byBrowser: Breakdown[];
+  byOs: Breakdown[];
+  topPages: Breakdown[];
+}
+
+export interface IssueStat {
+  fingerprint: string;
+  label: string;
+  reports: number;
+  /** Different people who reported it. */
+  reporters: number;
+  unresolved: number;
+  lastSeen: string;
+}
+
+export interface BasicMetrics extends MetricsBase {
+  level: 'basic';
+  totals: { reports: number; previous: number; withRecording: number; withErrors: number };
+  series: { day: string; created: number }[];
+}
+
+export interface Metrics extends MetricsBase {
+  level: 'advanced';
   totals: {
     reports: number;
     previous: number;
@@ -241,10 +263,11 @@ export interface Metrics {
     deliveryFailures: number;
   };
   series: { day: string; created: number; resolved: number }[];
-  byCategory: { label: string; value: number }[];
-  byKind: { label: string; value: number }[];
-  byBrowser: { label: string; value: number }[];
-  byOs: { label: string; value: number }[];
-  topPages: { label: string; value: number }[];
-  topIssues: { fingerprint: string; label: string; reports: number; unresolved: number; lastSeen: string }[];
+  topIssues: IssueStat[];
+  peopleAffected: IssueStat[];
+  byToolStatus: Breakdown[];
+  byAssignee: Breakdown[];
+  byPriority: Breakdown[];
+  aging: Breakdown[];
+  screenErrors: (Breakdown & { lastSeen: string })[];
 }
