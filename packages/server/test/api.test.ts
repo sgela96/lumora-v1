@@ -454,3 +454,59 @@ test('Support Center: tool statuses, priorities, bulk edits, saved views and rem
     globalThis.fetch = realFetch;
   }
 });
+
+test('dashboard: one layout per organization, set by the owner; Business metrics for the new cards', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Owner', company: 'Umbrella', email: 'owner@umbrella.test', password: 'password123' } });
+  let me = (await call('/api/me')).body;
+  assert.equal(me.dashboard.canEdit, true);
+  assert.equal((await call('/api/account/dashboard', { method: 'PUT', body: { layout: [] } })).status, 402, 'Free has no dashboard');
+
+  await call('/api/billing/dev-plan', { body: { plan: 'pro' } });
+  me = (await call('/api/me')).body;
+  assert.equal(me.dashboard.custom, false);
+  assert.equal(me.dashboard.layout[0].id, 'kpi.reports');
+  // Unknown cards, duplicates and wrong sizes are cleaned up.
+  const saved = await call('/api/account/dashboard', {
+    method: 'PUT',
+    body: { layout: [{ id: 'byOs', size: 'L' }, { id: 'byOs', size: 'S' }, { id: 'nope', size: 'M' }, { id: 'kpi.open', size: 'L' }] },
+  });
+  assert.deepEqual(saved.body.layout, [{ id: 'byOs', size: 'L' }, { id: 'kpi.open', size: 'S' }]);
+  assert.equal((await call('/api/me')).body.dashboard.custom, true);
+
+  // A teammate in the same organization sees the same layout but can't change it.
+  const { run, one } = await import('../src/db');
+  const { hashPassword } = await import('../src/lib/crypto');
+  const account = one<{ account_id: string }>("SELECT account_id FROM users WHERE email = 'owner@umbrella.test'")!;
+  run('INSERT INTO users (id, account_id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)', 'usr_teammate', account.account_id, 'mate@umbrella.test', 'Mate', await hashPassword('password123'), '2999-01-01 00:00:00');
+  cookie = '';
+  assert.equal((await call('/api/auth/login', { body: { email: 'mate@umbrella.test', password: 'password123' } })).status, 200);
+  me = (await call('/api/me')).body;
+  assert.equal(me.dashboard.canEdit, false);
+  assert.deepEqual(me.dashboard.layout.map((i: { id: string }) => i.id), ['byOs', 'kpi.open']);
+  assert.equal((await call('/api/account/dashboard', { method: 'PUT', body: { layout: null } })).status, 403);
+
+  // Pro metrics carry the breakdowns its cards need.
+  const [project] = (await call('/api/projects')).body;
+  const basic = (await call(`/api/projects/${project.id}/metrics`)).body;
+  assert.equal(basic.level, 'basic');
+  for (const key of ['byBrowser', 'byOs', 'byKind', 'topPages']) assert.ok(Array.isArray(basic[key]), key);
+
+  // Business: people affected, workload, aging and the errors people saw.
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
+  const error = { level: 'error', message: 'TypeError: x is undefined', timestamp: Date.now() };
+  const seen = { level: 'error', message: 'Error shown on screen (Salesforce): “Insufficient access rights”', timestamp: Date.now() };
+  for (const email of ['a@x.test', 'b@x.test', 'a@x.test']) {
+    await report(project.publicKey, { kind: 'describe', fields: { category: 'Bug', description: 'Save fails' }, reporter: { email }, metadata: {}, console: [error, seen] });
+  }
+  run("UPDATE tickets SET assignee_name = 'Ada', priority = 'high' WHERE project_id = ?", project.id);
+  const m = (await call(`/api/projects/${project.id}/metrics?days=7`)).body;
+  assert.equal(m.peopleAffected[0].reporters, 2, 'three reports from two people');
+  assert.equal(m.peopleAffected[0].reports, 3);
+  assert.deepEqual(m.byAssignee, [{ label: 'Ada', value: 3 }]);
+  assert.deepEqual(m.byPriority, [{ label: 'High', value: 3 }]);
+  assert.equal(m.aging[0].value, 3);
+  assert.equal(m.screenErrors[0].label, 'Insufficient access rights');
+  assert.equal(m.screenErrors[0].value, 3);
+  assert.equal(m.byToolStatus[0].label, 'Open');
+});

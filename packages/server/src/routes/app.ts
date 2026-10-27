@@ -4,8 +4,10 @@ import path from 'node:path';
 import {
   ADDON_ORDER,
   ADDONS,
+  defaultDashboard,
   defaultSettings,
   mergeSettings,
+  sanitizeDashboard,
   PLANS,
   TEMPLATE_VARIABLES,
   type ProjectSettings, formatError } from '@lumora/shared';
@@ -34,6 +36,7 @@ import {
   getOwnedProject,
   HttpError,
   integrationConfig,
+  isAccountOwner,
   monthlyAiUsage,
   monthlyUsage,
   sealConfig,
@@ -138,6 +141,11 @@ export function appRouter(): Router {
         hasBillingCustomer: !!account.stripe_customer_id,
       },
       limits: accountLimits(account),
+      dashboard: {
+        layout: sanitizeDashboard(account.dashboard_layout ? JSON.parse(account.dashboard_layout) : null) ?? defaultDashboard(plan),
+        custom: !!account.dashboard_layout,
+        canEdit: isAccountOwner(account.id, req.user!.id),
+      },
       usage: { month: new Date().toISOString().slice(0, 7), reports: monthlyUsage(account.id), aiReports: monthlyAiUsage(account.id) },
       server: {
         publicUrl: config.publicUrl,
@@ -148,6 +156,17 @@ export function appRouter(): Router {
         supportEmail: config.supportEmail,
       },
     });
+  });
+
+  /** The Overview layout for the whole organization. Only the account owner changes it; null goes back to the default. */
+  router.put('/account/dashboard', (req, res) => {
+    const account = getAccount(req.user!.accountId);
+    if (!accountLimits(account).features.basicDashboard) throw new HttpError(402, 'The dashboard is part of Pro', 'upgrade');
+    if (!isAccountOwner(account.id, req.user!.id)) throw new HttpError(403, 'Only the account owner can change the dashboard');
+    const layout = req.body?.layout === null ? null : sanitizeDashboard(req.body?.layout);
+    if (req.body?.layout !== null && !layout) throw new HttpError(400, 'layout must be a list of cards');
+    run('UPDATE accounts SET dashboard_layout = ? WHERE id = ?', layout ? JSON.stringify(layout) : null, account.id);
+    res.json({ layout: layout ?? defaultDashboard(accountPlan(account)), custom: !!layout, canEdit: true });
   });
 
   router.patch('/me/onboarding', (req, res) => {

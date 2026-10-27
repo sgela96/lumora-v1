@@ -171,6 +171,10 @@ const MIGRATIONS: Migration[] = [
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   `,
+  // Customizable Overview: one layout per organization.
+  /* sql */ `
+  ALTER TABLE accounts ADD COLUMN dashboard_layout TEXT;
+  `,
 ];
 
 export function getDb(): DatabaseSync {

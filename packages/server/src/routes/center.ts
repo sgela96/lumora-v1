@@ -246,22 +246,57 @@ export function centerRouter(): Router {
       };
     });
 
+    const withRecording = count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND recording_file IS NOT NULL', p, since);
+    const withErrors = count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND error_count > 0', p, since);
+    const basic = {
+      days,
+      recent,
+      byCategory: breakdown('category'),
+      byKind: breakdown('kind', 3),
+      byBrowser: breakdown('browser'),
+      byOs: breakdown('os'),
+      topPages: breakdown('page_path', 8),
+    };
+
     if (!advanced) {
       res.json({
         level: 'basic',
-        days,
-        totals: { reports, previous, withRecording: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND recording_file IS NOT NULL', p, since), withErrors: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND error_count > 0', p, since) },
+        ...basic,
+        totals: { reports, previous, withRecording, withErrors },
         series: [...byDay.values()].map((d) => ({ day: d.day, created: d.created })),
-        byCategory: breakdown('category'),
-        recent,
       });
       return;
     }
 
+    // Issues with how many different people reported them (anonymous reports count once each).
+    const issues = (order: string) =>
+      all<{ fingerprint: string; label: string; reports: number; reporters: number; unresolved: number; last_seen: string }>(
+        `SELECT fingerprint, MAX(issue_label) AS label, COUNT(*) AS reports, COUNT(DISTINCT COALESCE(reporter_email, id)) AS reporters,
+                SUM(status != 'resolved') AS unresolved, MAX(created_at) AS last_seen
+         FROM tickets WHERE project_id = ? AND created_at >= ? AND fingerprint IS NOT NULL
+         GROUP BY fingerprint ORDER BY ${order} LIMIT 6`,
+        p,
+        since,
+      ).map((i) => ({ fingerprint: i.fingerprint, label: i.label, reports: i.reports, reporters: i.reporters, unresolved: i.unresolved, lastSeen: i.last_seen }));
+
+    // The team's current workload: every open report, whatever the period.
+    const openBreakdown = (expression: string, limit = 8) =>
+      all<{ label: string; value: number }>(
+        `SELECT ${expression} AS label, COUNT(*) AS value FROM tickets WHERE project_id = ? AND status != 'resolved' GROUP BY label ORDER BY value DESC LIMIT ?`,
+        p,
+        limit,
+      );
+    const priorities = new Map(openBreakdown("COALESCE(priority, 'none')").map((r) => [r.label, r.value]));
+    const PRIORITY_LABELS: [string, string][] = [['urgent', 'Urgent'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low'], ['none', 'No priority']];
+    const age = one<{ week: number; twoWeeks: number; month: number; older: number }>(
+      `SELECT SUM(d < 7) AS week, SUM(d >= 7 AND d < 14) AS twoWeeks, SUM(d >= 14 AND d < 30) AS month, SUM(d >= 30) AS older
+       FROM (SELECT julianday('now') - julianday(created_at) AS d FROM tickets WHERE project_id = ? AND status != 'resolved')`,
+      p,
+    )!;
+
     res.json({
       level: 'advanced',
-      recent,
-      days,
+      ...basic,
       totals: {
         reports,
         previous,
@@ -270,23 +305,23 @@ export function centerRouter(): Router {
         resolved: resolvedRows.length,
         medianResolutionHours: median,
         reporters: count('SELECT COUNT(DISTINCT reporter_email) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND reporter_email IS NOT NULL', p, since),
-        withRecording: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND recording_file IS NOT NULL', p, since),
-        withErrors: count('SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND error_count > 0', p, since),
+        withRecording,
+        withErrors,
         deliveryFailures: count("SELECT COUNT(*) AS n FROM tickets WHERE project_id = ? AND created_at >= ? AND delivery_status = 'failed'", p, since),
       },
       series: [...byDay.values()],
-      byCategory: breakdown('category'),
-      byKind: breakdown('kind', 3),
-      byBrowser: breakdown('browser'),
-      byOs: breakdown('os'),
-      topPages: breakdown('page_path', 8),
-      topIssues: all<{ fingerprint: string; label: string; reports: number; unresolved: number; last_seen: string }>(
-        `SELECT fingerprint, MAX(issue_label) AS label, COUNT(*) AS reports, SUM(status != 'resolved') AS unresolved, MAX(created_at) AS last_seen
-         FROM tickets WHERE project_id = ? AND created_at >= ? AND fingerprint IS NOT NULL
-         GROUP BY fingerprint ORDER BY reports DESC LIMIT 6`,
-        p,
-        since,
-      ).map((i) => ({ fingerprint: i.fingerprint, label: i.label, reports: i.reports, unresolved: i.unresolved, lastSeen: i.last_seen })),
+      topIssues: issues('reports DESC'),
+      peopleAffected: issues('reporters DESC, reports DESC'),
+      byToolStatus: openBreakdown("COALESCE(external_status, CASE status WHEN 'in_progress' THEN 'In progress' ELSE 'Open' END)"),
+      byAssignee: openBreakdown("COALESCE(assignee_name, 'Unassigned')"),
+      byPriority: PRIORITY_LABELS.map(([key, label]) => ({ label, value: priorities.get(key) ?? 0 })).filter((r) => r.value > 0),
+      aging: [
+        { label: 'Under a week', value: age.week ?? 0 },
+        { label: '1–2 weeks', value: age.twoWeeks ?? 0 },
+        { label: '2–4 weeks', value: age.month ?? 0 },
+        { label: 'Older', value: age.older ?? 0 },
+      ],
+      screenErrors: screenErrors(p, since),
     });
   });
 
@@ -435,6 +470,37 @@ function ownedTicket(req: Request): TicketRow {
 
 function reminderChannels(projectId: string): IntegrationRow[] {
   return all<IntegrationRow>('SELECT * FROM integrations WHERE project_id = ? AND enabled = 1 ORDER BY created_at', projectId).filter((i) => getConnector(i.type)?.remind);
+}
+
+/** The error messages people saw on screen (read by the widget), most frequent first. */
+function screenErrors(projectId: string, since: string): { label: string; value: number; lastSeen: string }[] {
+  const rows = all<{ payload: string; created_at: string }>(
+    "SELECT payload, created_at FROM tickets WHERE project_id = ? AND created_at >= ? AND payload LIKE '%Error shown on screen%' ORDER BY created_at DESC LIMIT 2000",
+    projectId,
+    since,
+  );
+  const counts = new Map<string, { value: number; lastSeen: string }>();
+  for (const row of rows) {
+    let entries: { message?: string }[] = [];
+    try {
+      entries = (JSON.parse(row.payload) as { console?: { message?: string }[] }).console ?? [];
+    } catch {
+      continue;
+    }
+    const seen = new Set<string>();
+    for (const e of entries) {
+      const m = e.message?.match(/^Error shown on screen(?: \(Salesforce\))?: “(.+)”$/s);
+      if (!m || seen.has(m[1])) continue;
+      seen.add(m[1]);
+      const c = counts.get(m[1]) ?? { value: 0, lastSeen: row.created_at };
+      c.value++;
+      counts.set(m[1], c);
+    }
+  }
+  return [...counts.entries()]
+    .map(([label, c]) => ({ label, ...c }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
 }
 
 // ---------------------------------------------------------- Workflow helpers
