@@ -66,6 +66,11 @@ export class ConsoleCapture {
     return () => this.listeners.delete(listener);
   }
 
+  /** Adds an entry to the report without notifying listeners (e.g. an error message read from the screen). */
+  note(entry: ConsoleEntry): void {
+    this.buffer.push(entry);
+  }
+
   entries(levels: LogLevel[], max: number): ConsoleEntry[] {
     return this.buffer.toArray().filter((e) => levels.includes(e.level)).slice(-max);
   }

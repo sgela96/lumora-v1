@@ -72,6 +72,8 @@ export interface PlanLimits {
     userIdentity: boolean;
     removeBranding: boolean;
     redactionRules: boolean;
+    /** Hidden-until-needed nebula, failed requests and on-screen error messages (Salesforce included) as signals. */
+    smartLauncher: boolean;
     routingByCategory: boolean;
     /** Basic dashboard: volume, trend, categories, latest reports. */
     basicDashboard: boolean;
@@ -118,6 +120,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       userIdentity: true,
       removeBranding: false,
       redactionRules: false,
+      smartLauncher: false,
       routingByCategory: false,
       basicDashboard: false,
       supportCenter: false,
@@ -151,6 +154,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       userIdentity: true,
       removeBranding: false,
       redactionRules: false,
+      smartLauncher: true,
       routingByCategory: false,
       basicDashboard: true,
       supportCenter: false,
@@ -190,6 +194,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
       userIdentity: true,
       removeBranding: true,
       redactionRules: true,
+      smartLauncher: true,
       routingByCategory: true,
       basicDashboard: true,
       supportCenter: true,

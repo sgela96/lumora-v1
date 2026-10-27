@@ -904,3 +904,35 @@ button.nav-link { width: 100%; border: 0; background: none; font: inherit; text-
 .board-card-title { font-size: 14px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .board-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; min-width: 0; }
 .select-sm { width: auto; padding-top: 6px; padding-bottom: 6px; font-size: 13px; }
+
+/* ---------- Widget: when the nebula shows up ---------- */
+.choice-cards { display: grid; gap: 8px; }
+.choice-card { display: grid; grid-template-columns: 36px minmax(0, 1fr) 22px; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--fill); color: var(--text); font: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 0 0 1px transparent; transition: background .15s, box-shadow .15s; }
+.choice-card:hover { background: var(--fill-2); }
+.choice-card[aria-checked="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.choice-card[aria-disabled="true"] { cursor: default; }
+.choice-card[aria-disabled="true"] .choice-icon, .choice-card[aria-disabled="true"] .choice-text > .hint { opacity: .6; }
+.choice-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--surface); color: var(--text-2); }
+.choice-icon svg { display: block; }
+.choice-card[aria-checked="true"] .choice-icon { color: var(--accent-ink); }
+.choice-text { display: grid; gap: 2px; min-width: 0; }
+.choice-check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--separator); color: var(--on-accent); }
+.choice-check svg { display: block; }
+.choice-card[aria-checked="true"] .choice-check { background: var(--accent); box-shadow: none; }
+.signal-list { display: grid; gap: 10px; padding-top: 14px; }
+.check-line { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; cursor: pointer; }
+.check-line input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--text); }
+.check-line > span { display: grid; gap: 2px; }
+.check-line strong { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.check-line.locked { cursor: default; }
+.check-line.locked .hint { opacity: .7; }
+
+/* ---------- Install: platforms ---------- */
+.install-tabs .segmented { flex-wrap: wrap; max-width: 100%; }
+.install-tabs .segment { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.install-tabs .logo-tile { width: 18px; height: 18px; border-radius: 5px; font-size: 9px; }
+.install-steps { display: grid; gap: 14px; margin: 0; padding-left: 22px; }
+.install-steps li { padding-left: 4px; line-height: 1.55; }
+.install-steps li > .code-block, .install-files { margin-top: 10px; }
+.install-files { display: grid; gap: 8px; }
+.install-files .label { font-size: 12px; color: var(--muted); }

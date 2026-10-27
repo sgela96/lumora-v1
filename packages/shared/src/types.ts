@@ -30,7 +30,7 @@ export interface ProjectSettings {
     greeting: string;
     offsetX: number;
     offsetY: number;
-    /** The sun reacts when the page throws an error and invites the user to report it. */
+    /** The nebula reacts when something goes wrong and invites the user to report it. */
     proactiveOnError: boolean;
     showBranding: boolean;
   };
@@ -69,7 +69,28 @@ export interface ProjectSettings {
     maxSeconds: number;
     allowMicrophone: boolean;
   };
+  /** When the nebula shows up and what counts as "something went wrong". */
+  smart: {
+    /**
+     * always: the nebula is always on the page.
+     * onError: hidden until something goes wrong, then it appears and offers help.
+     * manual: hidden; your app opens it with Lumora('open') (a "Report a problem" link, a menu item…).
+     */
+    launcher: LauncherMode;
+    signals: {
+      /** Uncaught errors, unhandled promise rejections and console.error. */
+      pageErrors: boolean;
+      /** Requests that fail with a 5xx or never reach the server. */
+      failedRequests: boolean;
+      /** Error messages shown on screen: toasts and alerts, Salesforce Lightning included. */
+      errorMessages: boolean;
+    };
+    /** Extra CSS selectors of your own error banners, e.g. ".error-toast". */
+    errorSelectors: string[];
+  };
 }
+
+export type LauncherMode = 'always' | 'onError' | 'manual';
 
 /** What the widget receives from GET /api/widget/config. Already clamped to the plan. */
 export interface WidgetConfig {

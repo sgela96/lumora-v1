@@ -73,6 +73,25 @@ test('plan clamping turns off features the plan lacks', () => {
   assert.equal(business.recording.maxSeconds, 120);
 });
 
+test('hidden-until-needed and on-screen error signals are Pro and up', () => {
+  const s = defaultSettings();
+  assert.equal(s.smart.launcher, 'always');
+  s.smart.launcher = 'onError';
+  s.smart.errorSelectors = ['.error-toast'];
+  const free = clampSettingsToPlan(s, 'free');
+  assert.equal(free.smart.launcher, 'always', 'Free keeps the nebula on the page');
+  assert.equal(free.smart.signals.pageErrors, true, 'every plan reacts to page errors');
+  assert.equal(free.smart.signals.errorMessages, false);
+  assert.equal(free.smart.signals.failedRequests, false);
+  assert.deepEqual(free.smart.errorSelectors, []);
+  const pro = clampSettingsToPlan(s, 'pro');
+  assert.equal(pro.smart.launcher, 'onError');
+  assert.equal(pro.smart.signals.errorMessages, true);
+  assert.deepEqual(pro.smart.errorSelectors, ['.error-toast']);
+  // Settings saved before this existed get the defaults.
+  assert.equal(mergeSettings({ appearance: { proactiveOnError: false } }).smart.launcher, 'always');
+});
+
 test('mergeSettings fills new defaults into old stored settings and ignores junk', () => {
   const merged = mergeSettings({ appearance: { accentColor: '#000000', unknown: 1 }, capture: { console: { levels: ['error'] } }, extra: true });
   assert.equal(merged.appearance.accentColor, '#000000');

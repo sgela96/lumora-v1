@@ -97,6 +97,11 @@ export function defaultSettings(): ProjectSettings {
       redactSensitiveData: true,
     },
     recording: { maxSeconds: 120, allowMicrophone: true },
+    smart: {
+      launcher: 'always',
+      signals: { pageErrors: true, failedRequests: true, errorMessages: true },
+      errorSelectors: [],
+    },
   };
 }
 
@@ -144,6 +149,12 @@ export function clampSettingsToPlan(settings: ProjectSettings, plan: PlanId | Pl
   s.capture.aiSteps = s.capture.aiSteps && f.aiSteps;
   if (!f.removeBranding) s.appearance.showBranding = true;
   if (!f.redactionRules) s.capture.redactSelectors = [];
+  if (!f.smartLauncher) {
+    s.smart.launcher = 'always';
+    s.smart.signals.failedRequests = false;
+    s.smart.signals.errorMessages = false;
+    s.smart.errorSelectors = [];
+  }
   if (!f.customTemplate) {
     const d = defaultSettings();
     s.template = d.template;
