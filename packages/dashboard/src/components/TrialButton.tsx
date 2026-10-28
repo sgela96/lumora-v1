@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api';
-import { useApp } from '../state';
+import { useApp, usePermissions } from '../state';
 import { Icons } from './icons';
 import { useToast } from './ui';
 
@@ -9,7 +9,8 @@ export function TrialButton({ className = 'btn btn-primary' }: { className?: str
   const { me, refresh } = useApp();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  if (!me.account.canTrial) return null;
+  const can = usePermissions();
+  if (!me.account.canTrial || !can.billing) return null;
   const start = async () => {
     setBusy(true);
     try {

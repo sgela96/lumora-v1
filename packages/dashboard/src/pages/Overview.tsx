@@ -4,7 +4,7 @@ import { api, type BasicMetrics, type Me, type Metrics, type Project } from '../
 import { CardGallery, DashCell, DashboardCard, PresetMenu, type CardContext } from '../components/Dashboard';
 import { Icons } from '../components/icons';
 import { Nebula, Segmented, Upsell, useToast } from '../components/ui';
-import { navigate, useApp } from '../state';
+import { navigate, useApp, usePermissions } from '../state';
 import { setupProgress } from './Setup';
 import { TrialButton } from '../components/TrialButton';
 
@@ -225,7 +225,8 @@ export function OverviewPage({ project }: { project: Project }) {
 /** Stays on the Overview until the app is installed, connected and has received a report. */
 function GettingStarted({ project }: { project: Project }) {
   const progress = setupProgress(project);
-  if (progress.done === progress.total) return null;
+  const can = usePermissions();
+  if (progress.done === progress.total || !can.settings) return null;
   return (
     <section className="card card-pad getting-started iris-border lift">
       <div className="spread">

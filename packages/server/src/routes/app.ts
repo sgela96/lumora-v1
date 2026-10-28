@@ -12,7 +12,7 @@ import {
   TEMPLATE_VARIABLES,
   type ProjectSettings, formatError } from '@lumora/shared';
 import { Router, type Request, type Response } from 'express';
-import { endSession, requireJsonForMutations, requireUser, startSession } from '../auth';
+import { endSession, requireJsonForMutations, requireRole, requireUser, startSession } from '../auth';
 import { config } from '../config';
 import { connectorCatalog, getConnector } from '../connectors';
 import { all, one, run, transaction } from '../db';
@@ -50,6 +50,9 @@ import {
   type ProjectRow,
   type TicketRow,
 } from '../services';
+
+/** Apps, the widget key and destinations are settings: owner and admin only. */
+const settingsRole = requireRole('owner', 'admin');
 
 const str = (v: unknown, max = 200): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
@@ -144,6 +147,8 @@ export function appRouter(): Router {
         canTrial: canStartTrial(account),
         active: subscriptionActive(account),
         hasBillingCustomer: !!account.stripe_customer_id,
+        /** Who to ask for settings or plan changes. */
+        ownerName: one<{ name: string }>("SELECT name FROM users WHERE account_id = ? AND role = 'owner'", account.id)?.name ?? null,
       },
       limits: accountLimits(account),
       dashboard: {
@@ -201,7 +206,7 @@ export function appRouter(): Router {
     res.json(rows.map((r) => ({ ...serializeProject(r), tickets: r.tickets, destinations: r.destinations, lastTicketAt: r.last_ticket })));
   });
 
-  router.post('/projects', (req, res) => {
+  router.post('/projects', settingsRole, (req, res) => {
     const account = getAccount(req.user!.accountId);
     const count = one<{ n: number }>('SELECT COUNT(*) AS n FROM projects WHERE account_id = ?', account.id)!.n;
     if (count >= accountLimits(account).projects) throw new HttpError(402, 'Your plan does not include more apps. Add an extra app or upgrade.', 'upgrade');
@@ -215,8 +220,8 @@ export function appRouter(): Router {
     res.json(serializeProject(getOwnedProject(req.user!.accountId, req.params.id)));
   });
 
-  router.patch('/projects/:id', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
+  router.patch('/projects/:id', settingsRole, (req, res) => {
+    const project = getOwnedProject(req.user!.accountId, String(req.params.id));
     const name = req.body.name !== undefined ? str(req.body.name, 80) : project.name;
     if (!name) throw new HttpError(400, 'Name is required');
     const prefix = req.body.ticketPrefix !== undefined ? str(req.body.ticketPrefix, 10).toUpperCase() : project.ticket_prefix;
@@ -236,27 +241,27 @@ export function appRouter(): Router {
     res.json(serializeProject(getOwnedProject(req.user!.accountId, project.id)));
   });
 
-  router.post('/projects/:id/rotate-key', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
+  router.post('/projects/:id/rotate-key', settingsRole, (req, res) => {
+    const project = getOwnedProject(req.user!.accountId, String(req.params.id));
     run('UPDATE projects SET public_key = ? WHERE id = ?', `pk_${randomToken(18)}`, project.id);
     res.json(serializeProject(getOwnedProject(req.user!.accountId, project.id)));
   });
 
-  router.delete('/projects/:id', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
+  router.delete('/projects/:id', settingsRole, (req, res) => {
+    const project = getOwnedProject(req.user!.accountId, String(req.params.id));
     run('DELETE FROM projects WHERE id = ?', project.id);
     res.json({ ok: true });
   });
 
   // ------------------------------------------------------------ Integrations
 
-  router.get('/projects/:id/integrations', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
+  router.get('/projects/:id/integrations', settingsRole, (req, res) => {
+    const project = getOwnedProject(req.user!.accountId, String(req.params.id));
     res.json(all<IntegrationRow>('SELECT * FROM integrations WHERE project_id = ? ORDER BY created_at', project.id).map(serializeIntegration));
   });
 
-  router.post('/projects/:id/integrations', (req, res) => {
-    const project = getOwnedProject(req.user!.accountId, req.params.id);
+  router.post('/projects/:id/integrations', settingsRole, (req, res) => {
+    const project = getOwnedProject(req.user!.accountId, String(req.params.id));
     const limits = accountLimits(getAccount(req.user!.accountId));
     const type = str(req.body.type, 30);
     const connector = getConnector(type);
@@ -293,7 +298,7 @@ export function appRouter(): Router {
     res.status(201).json(serializeIntegration(row));
   });
 
-  router.patch('/integrations/:id', (req, res) => {
+  router.patch('/integrations/:id', settingsRole, (req, res) => {
     const row = ownedIntegration(req);
     const cfg = req.body.config !== undefined ? cleanConfig(row.type, req.body.config, integrationConfig(row)) : integrationConfig(row);
     const enabled = req.body.enabled !== undefined ? (req.body.enabled ? 1 : 0) : row.enabled;
@@ -314,7 +319,7 @@ export function appRouter(): Router {
   });
 
   /** Creates the status webhook in the remote tool (Jira, GitHub…) so status updates arrive instantly. */
-  router.post('/integrations/:id/auto-hook', async (req, res) => {
+  router.post('/integrations/:id/auto-hook', settingsRole, async (req, res) => {
     const row = ownedIntegration(req);
     const connector = getConnector(row.type) as (Connector & HookCapable) | undefined;
     if (!connector?.registerStatusWebhook || !row.hook_token) throw new HttpError(400, 'This tool needs the webhook to be added by hand — follow the guide.');
@@ -328,7 +333,7 @@ export function appRouter(): Router {
     }
   });
 
-  router.delete('/integrations/:id', async (req, res) => {
+  router.delete('/integrations/:id', settingsRole, async (req, res) => {
     const row = ownedIntegration(req);
     const connector = getConnector(row.type) as (Connector & HookCapable) | undefined;
     // Best effort: remove the webhook we created in the remote tool.
@@ -339,7 +344,7 @@ export function appRouter(): Router {
     res.json({ ok: true });
   });
 
-  router.post('/integrations/:id/test', async (req, res) => {
+  router.post('/integrations/:id/test', settingsRole, async (req, res) => {
     const row = ownedIntegration(req);
     const connector = getConnector(row.type)!;
     try {

@@ -36,6 +36,16 @@ export function useFeatureLock() {
   return (feature: keyof PlanLimits['features']) => (me.limits.features[feature] ? undefined : minimumPlanFor(feature));
 }
 
+/** What the signed-in person's role allows: settings for owners and admins, billing for the owner. */
+export function usePermissions() {
+  const { me } = useApp();
+  return permissionsFor(me);
+}
+
+export function permissionsFor(me: Me) {
+  return { settings: me.user.role !== 'member', billing: me.user.role === 'owner', ownerName: me.account.ownerName ?? 'the account owner' };
+}
+
 /** `tier('recording')` → the plan that introduces the feature ('free' for features every plan has). */
 export function useFeatureTier() {
   return (feature: keyof PlanLimits['features']) => minimumPlanFor(feature);

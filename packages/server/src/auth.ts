@@ -72,6 +72,12 @@ export function requireUser(req: Request, _res: Response, next: NextFunction): v
   next();
 }
 
+/** Owner and admin manage settings; billing is the owner's. Members see and triage reports. */
+export function requireRole(...roles: AuthUser['role'][]) {
+  const message = roles.length === 1 && roles[0] === 'owner' ? 'Only the account owner can do this' : 'Only the owner or an admin can change settings';
+  return (req: Request, _res: Response, next: NextFunction) => next(req.user && roles.includes(req.user.role) ? undefined : new HttpError(403, message, 'role'));
+}
+
 /**
  * CSRF guard for cookie-authenticated endpoints: state-changing requests must be JSON,
  * which a cross-site HTML form cannot send without a CORS preflight.

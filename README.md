@@ -29,7 +29,7 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 
 ### Organización
 
-*Account → Organization*: nombre de la organización, seats usados (personas + invitaciones pendientes), personas con su rol y última actividad, e invitaciones. Se invita por e-mail (o compartiendo el link si el server no tiene SMTP); la persona entra en `#/invite/<token>`, elige nombre y contraseña y queda en la organización. Roles: **Owner** (personas y roles, defaults del dashboard y de Reports para todos; puede pasar la propiedad), **Admin** (invita y quita personas), **Member** (ve y trabaja los reportes). Los roles todavía no limitan Settings ni Billing.
+*Account → Organization*: nombre de la organización, seats usados (personas + invitaciones pendientes), personas con su rol y última actividad, e invitaciones. Se invita por e-mail (o compartiendo el link si el server no tiene SMTP); la persona entra en `#/invite/<token>`, elige nombre y contraseña y queda en la organización. Roles: **Owner** (Plan & billing, roles, defaults del dashboard y de Reports para todos; puede pasar la propiedad), **Admin** (Settings: widget, template, integraciones y apps; invita y quita personas), **Member** (ve y trabaja los reportes, sin Settings ni Billing). El server lo hace cumplir (403) y el back office esconde lo que cada rol no puede usar.
 
 ### Dashboard personalizable (Pro y Business)
 

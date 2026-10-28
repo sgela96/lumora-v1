@@ -35,6 +35,7 @@ export interface Me {
     canTrial: boolean;
     active: boolean;
     hasBillingCustomer: boolean;
+    ownerName: string | null;
   };
   limits: PlanLimits;
   /** The organization's Overview layout; only the account owner can change it. */

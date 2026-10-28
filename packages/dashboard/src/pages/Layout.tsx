@@ -8,7 +8,7 @@ import { Showcase } from '../components/Showcase';
 import { Nebula, PageHead, Upsell, useToast } from '../components/ui';
 import { TrialButton } from '../components/TrialButton';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { navigate, useApp, useRoute } from '../state';
+import { navigate, useApp, usePermissions, useRoute } from '../state';
 import { BillingPage } from './Billing';
 import { OverviewPage } from './Overview';
 import { ReportsPage } from './Reports';
@@ -27,16 +27,18 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   const supportCenter = me.limits.features.supportCenter;
   const dashboard = me.limits.features.basicDashboard;
 
+  const can = usePermissions();
   const [root, projectId, section = 'overview', sub] = route;
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
   useEffect(() => {
-    if (root === 'billing' || root === 'organization' || root === 'setup' || !project) return;
+    if (root === 'billing' || root === 'organization' || (root === 'setup' && can.settings) || !project) return;
     if (root !== 'p' || !projects.some((p) => p.id === projectId)) {
-      // New accounts land in the setup guide until they finish or skip it.
-      navigate(!onboarding.setupDone ? '/setup' : `/p/${project.id}/${project.tickets ? 'overview' : 'settings/install'}`);
+      // New accounts land in the setup guide until they finish or skip it; members go straight to the reports.
+      const home = project.tickets || !can.settings ? (dashboard ? 'overview' : 'reports') : 'settings/install';
+      navigate(!onboarding.setupDone && can.settings ? '/setup' : `/p/${project.id}/${home}`);
     }
-  }, [root, projectId, project, projects, onboarding.setupDone]);
+  }, [root, projectId, project, projects, onboarding.setupDone, can.settings]);
 
   const saveOnboarding = useCallback((patch: Record<string, boolean>) => api('/me/onboarding', { method: 'PATCH', body: patch }).then(refresh), [refresh]);
 
@@ -85,7 +87,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
       ? Math.max(0, Math.ceil((new Date(me.account.trialEndsAt).getTime() - Date.now()) / 86400_000))
       : null;
 
-  if (root === 'setup' && project) {
+  if (root === 'setup' && project && can.settings) {
     return (
       <SetupPage
         project={project}
@@ -99,19 +101,19 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   }
 
   let page = null;
-  if (root === 'billing') page = <BillingPage />;
+  if (root === 'billing') page = can.billing ? <BillingPage /> : <NoAccess what="billing" ownerName={can.ownerName} projectId={project?.id} />;
   else if (root === 'organization') page = <OrganizationPage />;
   else if (project) {
     if (section === 'overview') page = <OverviewPage key={project.id} project={project} />;
     else if (section === 'reports' && sub) page = <TicketPage key={sub} project={project} ticketId={sub} />;
     else if (section === 'reports') page = <ReportsPage key={project.id} project={project} />;
-    else if (section === 'settings') page = <SettingsPage key={project.id} project={project} tab={sub ?? 'install'} />;
+    else if (section === 'settings') page = can.settings ? <SettingsPage key={project.id} project={project} tab={sub ?? 'install'} /> : <NoAccess what="settings" ownerName={can.ownerName} projectId={project.id} />;
   }
 
   const nav = [
     { id: 'overview', label: 'Overview', icon: Icons.overview, locked: !dashboard },
     { id: 'reports', label: 'Reports', icon: Icons.reports, count: project?.tickets, locked: false },
-    { id: 'settings', label: 'Settings', icon: Icons.settings },
+    ...(can.settings ? [{ id: 'settings', label: 'Settings', icon: Icons.settings }] : []),
   ];
 
   return (
@@ -140,7 +142,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
                 {p.name}
               </option>
             ))}
-            <option value="__new">Add an app…</option>
+            {can.settings && <option value="__new">Add an app…</option>}
           </select>
         </div>
 
@@ -162,9 +164,11 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
         <a className={`nav-link${root === 'organization' ? ' active' : ''}`} href="#/organization">
           <Icons.users /> Organization
         </a>
-        <a data-tour="nav-billing" className={`nav-link${root === 'billing' ? ' active' : ''}`} href="#/billing">
-          <Icons.billing /> Plan & billing
-        </a>
+        {can.billing && (
+          <a data-tour="nav-billing" className={`nav-link${root === 'billing' ? ' active' : ''}`} href="#/billing">
+            <Icons.billing /> Plan & billing
+          </a>
+        )}
         <button data-tour="help" className="nav-link" onClick={() => setHelpOpen(true)}>
           <Icons.help /> Help
         </button>
@@ -210,12 +214,14 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
               <span>
                 Your Pro trial ends {trialDays === 0 ? 'today' : `in ${trialDays} day${trialDays === 1 ? '' : 's'}`}. Keep recordings, the dashboard and your template — or move to Free.
               </span>
-              <a className="btn btn-sm btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
-                Choose a plan
-              </a>
+              {can.billing && (
+                <a className="btn btn-sm btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
+                  Choose a plan
+                </a>
+              )}
             </div>
           )}
-          {!onboarding.setupDone && project && root === 'p' && (
+          {!onboarding.setupDone && can.settings && project && root === 'p' && (
             <div className="trial-banner rise">
               <Icons.check size={16} />
               <span>Finish setting up Lumora — it takes about five minutes.</span>
@@ -239,6 +245,28 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
             startTour();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/** Settings are for owners and admins, billing for the owner; links can still lead here, so explain who to ask. */
+function NoAccess({ what, ownerName, projectId }: { what: 'settings' | 'billing'; ownerName: string; projectId?: string }) {
+  return (
+    <div className="no-access card card-pad">
+      <span className="no-access-icon" aria-hidden>
+        <Icons.lock size={20} />
+      </span>
+      <h1>{what === 'billing' ? 'Plan & billing is managed by the owner' : 'Settings are for owners and admins'}</h1>
+      <p className="muted">
+        {what === 'billing'
+          ? `Ask ${ownerName} if your team needs another plan or extras.`
+          : `You can see and triage every report. To change the widget, the template or the integrations, ask ${ownerName} or an admin.`}
+      </p>
+      {projectId && (
+        <a className="btn btn-primary" href={`#/p/${projectId}/reports`} style={{ textDecoration: 'none' }}>
+          Go to the reports
+        </a>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import { NEBULA_CSS, nebulaSvg, PLANS, type PlanId, type TicketStatus } from '@lumora/shared';
 import { PRIORITIES, type Priority, type RemoteStatus } from '../api';
+import { usePermissions } from '../state';
 import { Icons } from './icons';
 
 // The nebula animations are shared with the widget; inject them once.
@@ -377,6 +378,7 @@ export function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; sa
 
 /** Shown over a Business-only screen for other plans, with the real UI blurred behind it. */
 export function Upsell({ title, children, cta = 'Upgrade to Business', action }: { title: string; children: ReactNode; cta?: string; action?: ReactNode }) {
+  const can = usePermissions();
   return (
     <div className="upsell card iris-border">
       <Nebula className="mark" />
@@ -384,10 +386,14 @@ export function Upsell({ title, children, cta = 'Upgrade to Business', action }:
       <p className="muted" style={{ margin: '8px 0 18px' }}>
         {children}
       </p>
-      {action ?? (
-        <a className="btn btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
-          <Icons.lock size={15} /> {cta}
-        </a>
+      {!can.billing ? (
+        <p className="small muted">Ask {can.ownerName} to upgrade the plan.</p>
+      ) : (
+        action ?? (
+          <a className="btn btn-primary" href="#/billing" style={{ textDecoration: 'none' }}>
+            <Icons.lock size={15} /> {cta}
+          </a>
+        )
       )}
     </div>
   );

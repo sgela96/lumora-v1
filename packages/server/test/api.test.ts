@@ -492,7 +492,14 @@ test('dashboard: one layout per organization, set by the owner; Business metrics
   assert.equal(basic.level, 'basic');
   for (const key of ['byBrowser', 'byOs', 'byKind', 'topPages']) assert.ok(Array.isArray(basic[key]), key);
 
+  // Members don't touch settings or billing.
+  assert.equal((await call(`/api/projects/${project.id}`, { method: 'PATCH', body: { name: 'Nope' } })).status, 403);
+  assert.equal((await call(`/api/projects/${project.id}/integrations`)).status, 403);
+  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'business' } })).status, 403);
+
   // Business: people affected, workload, aging and the errors people saw.
+  cookie = '';
+  await call('/api/auth/login', { body: { email: 'owner@umbrella.test', password: 'password123' } });
   await call('/api/billing/dev-plan', { body: { plan: 'business' } });
   const error = { level: 'error', message: 'TypeError: x is undefined', timestamp: Date.now() };
   const seen = { level: 'error', message: 'Error shown on screen (Salesforce): “Insufficient access rights”', timestamp: Date.now() };
@@ -581,6 +588,10 @@ test('organization: invitations use seats, invited people join with their role, 
   await call(`/api/invites/${adminInvite.body.link.split('/invite/')[1]}/accept`, { body: { name: 'Ada Admin', password: 'password123' } });
   org = (await call('/api/org')).body;
   assert.equal(org.you.role, 'admin');
+  // Admins change settings; billing stays with the owner.
+  const [seatProject] = (await call('/api/projects')).body;
+  assert.equal((await call(`/api/projects/${seatProject.id}`, { method: 'PATCH', body: { name: 'Seatco web' } })).status, 200);
+  assert.equal((await call('/api/billing/trial', { body: {} })).status, 403);
   assert.deepEqual(org.members.map((m: { role: string }) => m.role), ['owner', 'admin', 'member']);
   assert.equal((await call(`/api/org/members/${maxId}`, { method: 'PATCH', body: { role: 'admin' } })).status, 403, 'only the owner changes roles');
   const ownerId = org.members[0].id;

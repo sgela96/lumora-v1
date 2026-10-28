@@ -7,9 +7,9 @@ import { useApp } from '../state';
 
 const ROLE_LABEL: Record<Role, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
 const ROLE_HINT: Record<Role, string> = {
-  owner: 'Manages people and roles, and sets the dashboard and report display for everyone.',
-  admin: 'Invites and removes people.',
-  member: 'Sees and triages every report.',
+  owner: 'Everything an admin does, plus plan & billing, roles, and the dashboard and report display for everyone.',
+  admin: 'Changes settings (widget, template, integrations, apps) and invites and removes people.',
+  member: 'Sees and triages every report. No settings or billing.',
 };
 
 /** Who's in the organization, their role, pending invitations and seats. */
