@@ -1,3 +1,4 @@
+import { OrganizationPage } from './Organization';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api';
 import { HelpPanel } from '../components/Help';
@@ -30,7 +31,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
   const project = projects.find((p) => p.id === projectId) ?? projects[0];
 
   useEffect(() => {
-    if (root === 'billing' || root === 'setup' || !project) return;
+    if (root === 'billing' || root === 'organization' || root === 'setup' || !project) return;
     if (root !== 'p' || !projects.some((p) => p.id === projectId)) {
       // New accounts land in the setup guide until they finish or skip it.
       navigate(!onboarding.setupDone ? '/setup' : `/p/${project.id}/${project.tickets ? 'overview' : 'settings/install'}`);
@@ -99,6 +100,7 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
 
   let page = null;
   if (root === 'billing') page = <BillingPage />;
+  else if (root === 'organization') page = <OrganizationPage />;
   else if (project) {
     if (section === 'overview') page = <OverviewPage key={project.id} project={project} />;
     else if (section === 'reports' && sub) page = <TicketPage key={sub} project={project} ticketId={sub} />;
@@ -157,6 +159,9 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
           ))}
 
         <div className="nav-label">Account</div>
+        <a className={`nav-link${root === 'organization' ? ' active' : ''}`} href="#/organization">
+          <Icons.users /> Organization
+        </a>
         <a data-tour="nav-billing" className={`nav-link${root === 'billing' ? ' active' : ''}`} href="#/billing">
           <Icons.billing /> Plan & billing
         </a>

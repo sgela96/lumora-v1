@@ -27,6 +27,10 @@ Arriba de eso, el plan Business suma el **Support Center**: dashboard de métric
 | **Demo** (`demo/`) | App falsa con botones para romper cosas, para probar el widget. |
 | **Web** (`site/`) | Sitio de marketing en `/`: hero con la nebulosa, producto, cómo funciona, AI Powered, integraciones, Support Center, precios y registro (lleva nombre, e-mail y empresa al alta en `/app/#/register`). Un solo HTML estático, sin build. |
 
+### Organización
+
+*Account → Organization*: nombre de la organización, seats usados (personas + invitaciones pendientes), personas con su rol y última actividad, e invitaciones. Se invita por e-mail (o compartiendo el link si el server no tiene SMTP); la persona entra en `#/invite/<token>`, elige nombre y contraseña y queda en la organización. Roles: **Owner** (personas y roles, defaults del dashboard y de Reports para todos; puede pasar la propiedad), **Admin** (invita y quita personas), **Member** (ve y trabaja los reportes). Los roles todavía no limitan Settings ni Billing.
+
 ### Dashboard personalizable (Pro y Business)
 
 El Overview se arma con tarjetas. El dueño de la cuenta (quien la creó) toca el engranaje, arrastra, cambia tamaños (S, M, L), saca y agrega tarjetas desde una galería con vista previa con datos reales, o parte de un preset (Essentials, Product, Support, Engineering). Hay **un solo layout por organización**: todo el equipo ve lo mismo y solo el dueño lo edita (`PUT /api/account/dashboard`). Las tarjetas de Business (abiertos, tiempo de resolución, top issues, personas afectadas, por estado del tool, por asignado, por prioridad, antigüedad y errores que vio la gente en pantalla) aparecen con candado en Pro. Catálogo y presets en `packages/shared/src/dashboard.ts`.
@@ -58,6 +62,7 @@ El ticket se arma con un template Markdown (`{{steps}}`, `{{console}}`, `{{field
 |---|---|---|---|
 | Para quién | Probar el widget | El reporte de bug completo | Centro de soporte |
 | Apps / reportes por mes | 1 / 25 | 1 / 500 | 25 / 10.000 |
+| Personas en la organización (seats) | 2 | 5 | 25 |
 | Captura + anotación, consola y entorno | ✓ | ✓ | ✓ |
 | Grabación con voz → pasos escritos | — | 2 min | 10 min |
 | Red y últimas acciones del usuario | — | ✓ | ✓ |

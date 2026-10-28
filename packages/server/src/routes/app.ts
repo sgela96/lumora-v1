@@ -20,6 +20,7 @@ import { aiAvailable } from '../lib/ai';
 import { resetPasswordMail, sendMail, welcomeMail } from '../lib/mail';
 import { transcriptionAvailable } from '../lib/transcribe';
 import { centerRouter } from './center';
+import { invitePublicRoutes, orgRoutes } from './org';
 import { hashPassword, id, randomToken, sha256, verifyPassword } from '../lib/crypto';
 import type { Connector } from '../connectors/types';
 import {
@@ -73,7 +74,7 @@ export function appRouter(): Router {
     const project = transaction(() => {
       // New accounts start on Free; a Pro trial is opt-in from the back office (POST /api/billing/trial).
       run('INSERT INTO accounts (id, name, plan, plan_status, trial_ends_at, onboarding) VALUES (?, ?, ?, ?, ?, ?)', accountId, company, 'free', 'active', null, JSON.stringify({ seenPlan: 'free|paid|' }));
-      run('INSERT INTO users (id, account_id, email, name, password_hash) VALUES (?, ?, ?, ?, ?)', userId, accountId, email, name, passwordHash);
+      run('INSERT INTO users (id, account_id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)', userId, accountId, email, name, passwordHash, 'owner');
       return createProject(accountId, company);
     });
     startSession(res, userId);
@@ -119,7 +120,11 @@ export function appRouter(): Router {
     res.json({ ok: true });
   });
 
+  invitePublicRoutes(router);
+
   router.use(requireUser);
+
+  orgRoutes(router);
 
   router.get('/me', (req, res) => {
     const account = getAccount(req.user!.accountId);

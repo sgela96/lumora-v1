@@ -19,7 +19,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
 }
 
 export interface Me {
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; name: string; role: Role };
   account: {
     id: string;
     name: string;
@@ -41,6 +41,19 @@ export interface Me {
   dashboard: { layout: DashboardItem[]; custom: boolean; canEdit: boolean };
   usage: { month: string; reports: number; aiReports: number };
   server: { publicUrl: string; billingEnabled: boolean; aiAvailable: boolean; transcriptionAvailable: boolean; emailAvailable: boolean; supportEmail: string };
+}
+
+export type Role = 'owner' | 'admin' | 'member';
+
+export interface Organization {
+  id: string;
+  name: string;
+  createdAt: string;
+  seats: { used: number; limit: number };
+  you: { id: string; role: Role; canManage: boolean };
+  members: { id: string; name: string; email: string; role: Role; lastSeenAt: string | null; joinedAt: string }[];
+  invites: { id: string; email: string; role: Role; invitedBy: string | null; sentAt: string; expiresAt: string; expired: boolean }[];
+  emailAvailable: boolean;
 }
 
 export interface ConnectorInfo {

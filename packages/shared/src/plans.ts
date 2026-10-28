@@ -47,6 +47,8 @@ export interface PlanLimits {
   priceMonthlyUsd: number;
   tagline: string;
   projects: number;
+  /** People in the organization, invitations included. */
+  seats: number;
   reportsPerMonth: number;
   /** Reports per month processed by AI Powered (transcription, summary, triage). */
   aiReportsPerMonth: number;
@@ -100,6 +102,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     priceMonthlyUsd: 0,
     tagline: 'Try the widget',
     projects: 1,
+    seats: 2,
     reportsPerMonth: 25,
     aiReportsPerMonth: 0,
     destinationsPerProject: 1,
@@ -134,6 +137,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     priceMonthlyUsd: 49,
     tagline: 'The complete bug report',
     projects: 1,
+    seats: 5,
     reportsPerMonth: 500,
     aiReportsPerMonth: 0,
     destinationsPerProject: 1,
@@ -174,6 +178,7 @@ export const PLANS: Record<PlanId, PlanLimits> = {
     priceMonthlyUsd: 149,
     tagline: 'Your support command center',
     projects: 25,
+    seats: 25,
     reportsPerMonth: 10000,
     aiReportsPerMonth: 2000,
     destinationsPerProject: 10,

@@ -45,9 +45,11 @@ export interface AccountRow {
 
 /** The person who created the account: the only one who can change organization-wide settings like the dashboard. */
 export function isAccountOwner(accountId: string, userId: string): boolean {
-  const owner = one<{ id: string }>('SELECT id FROM users WHERE account_id = ? ORDER BY created_at, rowid LIMIT 1', accountId);
-  return owner?.id === userId;
+  return !!one('SELECT 1 FROM users WHERE id = ? AND account_id = ? AND role = ?', userId, accountId, 'owner');
 }
+
+export type Role = 'owner' | 'admin' | 'member';
+export const ROLES: Role[] = ['owner', 'admin', 'member'];
 
 export function getAccount(accountId: string): AccountRow {
   const account = one<AccountRow>('SELECT * FROM accounts WHERE id = ?', accountId);

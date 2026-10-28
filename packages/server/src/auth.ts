@@ -12,6 +12,7 @@ export interface AuthUser {
   accountId: string;
   email: string;
   name: string;
+  role: 'owner' | 'admin' | 'member';
 }
 
 declare module 'express-serve-static-core' {
@@ -52,12 +53,16 @@ function readCookie(req: Request, name: string): string | undefined {
 export function loadUser(req: Request, _res: Response, next: NextFunction): void {
   const token = readCookie(req, COOKIE);
   if (token) {
-    const row = one<{ id: string; account_id: string; email: string; name: string; expires_at: string }>(
-      `SELECT u.id, u.account_id, u.email, u.name, s.expires_at
+    const row = one<{ id: string; account_id: string; email: string; name: string; role: AuthUser['role']; last_seen_at: string | null; expires_at: string }>(
+      `SELECT u.id, u.account_id, u.email, u.name, u.role, u.last_seen_at, s.expires_at
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`,
       sha256(token),
     );
-    if (row && new Date(row.expires_at) > new Date()) req.user = { id: row.id, accountId: row.account_id, email: row.email, name: row.name };
+    if (row && new Date(row.expires_at) > new Date()) {
+      req.user = { id: row.id, accountId: row.account_id, email: row.email, name: row.name, role: row.role };
+      // "Last active" for the organization page, written at most every five minutes.
+      if (!row.last_seen_at || Date.now() - Date.parse(row.last_seen_at) > 5 * 60_000) run('UPDATE users SET last_seen_at = ? WHERE id = ?', new Date().toISOString(), row.id);
+    }
   }
   next();
 }

@@ -74,6 +74,22 @@ ${button(url, 'Open Lumora')}
   };
 }
 
+export function inviteMail(to: string, orgName: string, inviterName: string, token: string): Mail {
+  const url = inviteUrl(token);
+  return {
+    to,
+    subject: `Join ${orgName} on Lumora`,
+    html: `<p>${escapeHtml(inviterName)} invited you to <b>${escapeHtml(orgName)}</b> on Lumora, where your team sees every bug report with its screenshot, steps and console.</p>
+${button(url, `Join ${orgName}`)}
+<p>The invitation is valid for 7 days.</p>`,
+    text: `${inviterName} invited you to ${orgName} on Lumora.\n\nJoin: ${url}\n\nThe invitation is valid for 7 days.`,
+  };
+}
+
+export function inviteUrl(token: string): string {
+  return `${config.publicUrl}/app/#/invite/${encodeURIComponent(token)}`;
+}
+
 export function resetPasswordMail(to: string, token: string): Mail {
   const url = `${config.publicUrl}/app/#/reset?token=${encodeURIComponent(token)}`;
   return {
