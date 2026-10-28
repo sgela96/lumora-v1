@@ -175,6 +175,10 @@ const MIGRATIONS: Migration[] = [
   /* sql */ `
   ALTER TABLE accounts ADD COLUMN dashboard_layout TEXT;
   `,
+  // Reports: the display everyone starts from (layout, grouping, properties), set by the owner.
+  /* sql */ `
+  ALTER TABLE projects ADD COLUMN report_display TEXT;
+  `,
 ];
 
 export function getDb(): DatabaseSync {

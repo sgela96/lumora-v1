@@ -197,7 +197,8 @@ export function Layout({ onSignOut }: { onSignOut: () => void }) {
           </button>
           <strong>{project?.name ?? 'Lumora'}</strong>
         </div>
-        <main className="main">
+        {/* Reports and the Overview use the whole width; settings keep a readable measure. */}
+        <main className={`main${root === 'p' && (section === 'reports' || section === 'overview') ? ' main-wide' : ''}`}>
           {trialDays !== null && trialDays <= 3 && root !== 'billing' && (
             <div className="trial-banner rise">
               <Icons.sparkle size={16} />

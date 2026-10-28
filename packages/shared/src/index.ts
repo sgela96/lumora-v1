@@ -8,3 +8,4 @@ export * from './validate';
 export * from './markdown';
 export * from './template';
 export * from './dashboard';
+export * from './reports';

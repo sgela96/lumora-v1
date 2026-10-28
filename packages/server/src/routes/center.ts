@@ -1,4 +1,4 @@
-import { PLANS, type TicketStatus } from '@lumora/shared';
+import { PLANS, sanitizeReportDisplay, type TicketStatus } from '@lumora/shared';
 import express, { Router, type Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { all, one, run } from '../db';
@@ -12,6 +12,7 @@ import {
   getOwnedProject,
   HttpError,
   integrationConfig,
+  isAccountOwner,
   PRIORITIES,
   serializeTicket,
   type Delivery,
@@ -46,36 +47,30 @@ function filters(req: Request, project: ProjectRow, opts: { ignoreStatus?: boole
     where.push('status = ?');
     params.push(status);
   }
-  for (const [param, column] of [
-    ['category', 'category'],
-    ['kind', 'kind'],
-    ['browser', 'browser'],
-    ['page', 'page_path'],
-    ['issue', 'fingerprint'],
-  ] as const) {
-    const value = str(q[param], 300);
-    if (value) {
-      where.push(`${column} = ?`);
-      params.push(value);
+  // Every filter takes one or more values (?priority=urgent&priority=high), like "Priority is Urgent or High".
+  const values = (param: string, max = 300): string[] => {
+    const raw = q[param];
+    return (Array.isArray(raw) ? raw : [raw]).map((v) => str(v, max)).filter(Boolean).slice(0, 50);
+  };
+  const anyOf = (column: string, list: string[], none?: string) => {
+    if (!list.length) return;
+    const real = list.filter((v) => v !== none);
+    const parts: string[] = [];
+    if (real.length) {
+      parts.push(`${column} IN (${real.map(() => '?').join(', ')})`);
+      params.push(...real);
     }
-  }
-  const priority = str(q.priority, 20);
-  if (priority === 'none') where.push('priority IS NULL');
-  else if (PRIORITIES.includes(priority as Priority)) {
-    where.push('priority = ?');
-    params.push(priority);
-  }
-  const assignee = str(q.assignee, 200);
-  if (assignee === 'none') where.push('assignee_name IS NULL');
-  else if (assignee) {
-    where.push('assignee_name = ?');
-    params.push(assignee);
-  }
-  const external = str(q.external, 100);
-  if (external) {
-    where.push('external_status = ?');
-    params.push(external);
-  }
+    if (none && list.includes(none)) parts.push(`${column} IS NULL`);
+    where.push(`(${parts.join(' OR ')})`);
+  };
+  anyOf('category', values('category'), 'none');
+  anyOf('kind', values('kind'));
+  anyOf('browser', values('browser'));
+  anyOf('page_path', values('page'));
+  anyOf('fingerprint', values('issue'));
+  anyOf('priority', values('priority', 20).filter((p) => p === 'none' || PRIORITIES.includes(p as Priority)), 'none');
+  anyOf('assignee_name', values('assignee', 200), 'none');
+  anyOf('external_status', values('external', 100));
   if (q.delivery === 'failed') where.push("delivery_status = 'failed'");
   if (q.hasRecording === '1') where.push('recording_file IS NOT NULL');
   if (q.hasErrors === '1') where.push('error_count > 0');
@@ -377,6 +372,16 @@ export function centerRouter(): Router {
     const viewId = newId('vw');
     run('INSERT INTO saved_views (id, project_id, name, query, layout) VALUES (?, ?, ?, ?, ?)', viewId, project.id, name, str(req.body?.query, 1000), JSON.stringify(req.body?.layout ?? {}).slice(0, 2000));
     res.status(201).json({ id: viewId, name, query: str(req.body?.query, 1000), layout: req.body?.layout ?? {} });
+  });
+
+  /** The display everyone starts from. Only the account owner sets it; null goes back to Lumora's default. */
+  router.put('/projects/:id/report-display', (req, res) => {
+    requireSupportCenter(req);
+    const project = getOwnedProject(req.user!.accountId, req.params.id);
+    if (!isAccountOwner(req.user!.accountId, req.user!.id)) throw new HttpError(403, 'Only the account owner can set the default for everyone');
+    const display = req.body?.display === null ? null : sanitizeReportDisplay(req.body?.display);
+    run('UPDATE projects SET report_display = ? WHERE id = ?', display ? JSON.stringify(display) : null, project.id);
+    res.json({ display: display ?? sanitizeReportDisplay(null) });
   });
 
   router.delete('/views/:id', (req, res) => {

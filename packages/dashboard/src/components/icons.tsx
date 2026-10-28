@@ -11,6 +11,56 @@ function Icon({ size = 18, children }: { size?: number; children: ReactNode }) {
 type P = { size?: number };
 
 export const Icons = {
+  filter: (p: P) => (
+    <Icon {...p}>
+      <path d="M4 7h16M7 12h10M10 17h4" />
+    </Icon>
+  ),
+  chevronRight: (p: P) => (
+    <Icon {...p}>
+      <path d="M9 6l6 6-6 6" />
+    </Icon>
+  ),
+  expand: (p: P) => (
+    <Icon {...p}>
+      <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+    </Icon>
+  ),
+  search: (p: P) => (
+    <Icon {...p}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4.2-4.2" />
+    </Icon>
+  ),
+  calendar: (p: P) => (
+    <Icon {...p}>
+      <rect x="3.5" y="5" width="17" height="15" rx="3" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </Icon>
+  ),
+  tag: (p: P) => (
+    <Icon {...p}>
+      <path d="M3.5 12.6V5a1.5 1.5 0 0 1 1.5-1.5h7.6a1.5 1.5 0 0 1 1.06.44l6.4 6.4a1.5 1.5 0 0 1 0 2.12l-7.6 7.6a1.5 1.5 0 0 1-2.12 0l-6.4-6.4a1.5 1.5 0 0 1-.44-1.06z" />
+      <circle cx="8.5" cy="8.5" r="1.3" />
+    </Icon>
+  ),
+  monitor: (p: P) => (
+    <Icon {...p}>
+      <rect x="3" y="4" width="18" height="12" rx="2.5" />
+      <path d="M8 20h8M12 16v4" />
+    </Icon>
+  ),
+  file: (p: P) => (
+    <Icon {...p}>
+      <path d="M14 3.5H7A2.5 2.5 0 0 0 4.5 6v12A2.5 2.5 0 0 0 7 20.5h10a2.5 2.5 0 0 0 2.5-2.5V9z" />
+      <path d="M14 3.5V9h5.5" />
+    </Icon>
+  ),
+  status: (p: P) => (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="8" strokeDasharray="3 3.3" />
+    </Icon>
+  ),
   list: (p: P) => (
     <Icon {...p}>
       <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />

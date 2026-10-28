@@ -5,6 +5,7 @@ import {
   effectiveLimits,
   isPlanId,
   mergeSettings,
+  sanitizeReportDisplay,
   type AddonQuantities,
   type PlanLimits,
   type IntegrationType,
@@ -123,6 +124,8 @@ export interface ProjectRow {
   installed_at: string | null;
   installed_origin: string | null;
   first_report_at: string | null;
+  /** JSON ReportDisplay; null means Lumora's default. */
+  report_display: string | null;
   created_at: string;
 }
 
@@ -171,6 +174,7 @@ export function serializeProject(project: ProjectRow) {
     installedAt: project.installed_at,
     installedOrigin: project.installed_origin,
     firstReportAt: project.first_report_at,
+    reportDisplay: sanitizeReportDisplay(project.report_display ? JSON.parse(project.report_display) : null),
     createdAt: project.created_at,
   };
 }

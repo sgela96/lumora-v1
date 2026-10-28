@@ -24,7 +24,8 @@ export class LumoraApi {
       const ext = files.recording.type.includes('mp4') ? 'mp4' : 'webm';
       form.append('recording', files.recording, `recording.${ext}`);
     }
-    const res = await fetch(`${this.base}/api/widget/reports`, { method: 'POST', body: form, credentials: 'omit' });
+    // The key also goes in the URL so the server's rate limit can count per app before reading the upload.
+    const res = await fetch(`${this.base}/api/widget/reports?key=${encodeURIComponent(this.key)}`, { method: 'POST', body: form, credentials: 'omit' });
     if (!res.ok) throw new Error(await errorMessage(res));
     return res.json();
   }

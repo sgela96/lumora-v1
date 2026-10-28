@@ -5,7 +5,8 @@ import { Icons, LogoTile } from '../components/icons';
 import { Avatar, Card, CopyButton, PriorityPicker, StatusPicker, timeAgo, useDismiss, useToast } from '../components/ui';
 import { useApp, useWorkflow } from '../state';
 
-export function TicketPage({ project, ticketId }: { project: Project; ticketId: string }) {
+/** A report. Full page, or `embedded` in the side panel of the report list (changes are reported back so the list refreshes). */
+export function TicketPage({ project, ticketId, embedded }: { project: Project; ticketId: string; embedded?: { onChanged: () => void } }) {
   const { me } = useApp();
   const supportCenter = me.limits.features.supportCenter;
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
@@ -37,6 +38,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
       if (kind === 'resend') await api(`/tickets/${ticket.id}/resend`, { body: {} });
       else await api(`/tickets/${ticket.id}/sync`, { body: {} });
       await load();
+      embedded?.onChanged();
       toast(kind === 'resend' ? 'Sent again' : 'Status refreshed');
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), true);
@@ -48,6 +50,7 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
   const patch = async (body: object, done: string) => {
     try {
       setTicket(await api<TicketDetail>(`/tickets/${ticket.id}`, { method: 'PATCH', body }));
+      embedded?.onChanged();
       toast(done);
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), true);
@@ -58,14 +61,16 @@ export function TicketPage({ project, ticketId }: { project: Project; ticketId: 
   const setPriority = (priority: Priority | null) => patch({ priority: priority ?? 'none' }, 'Priority updated');
 
   return (
-    <div className="stack">
-      <a href={`#/p/${project.id}/reports`} className="muted small row" style={{ gap: 4 }}>
-        <Icons.back size={14} /> Reports
-      </a>
+    <div className={`stack${embedded ? ' ticket-embedded' : ''}`}>
+      {!embedded && (
+        <a href={`#/p/${project.id}/reports`} className="muted small row" style={{ gap: 4 }}>
+          <Icons.back size={14} /> Reports
+        </a>
+      )}
 
       <div className="page-head" style={{ marginBottom: 6 }}>
         <div style={{ minWidth: 0 }}>
-          <h1 style={{ fontSize: 24 }}>{ticket.title}</h1>
+          <h1 style={{ fontSize: embedded ? 20 : 24 }}>{ticket.title}</h1>
           <div className="row muted" style={{ marginTop: 8 }}>
             <span className="mono">{ticket.reference}</span>
             <span>·</span>

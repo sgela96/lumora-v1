@@ -83,7 +83,8 @@ export function navigate(path: string): void {
 }
 
 /** Query string inside the hash (#/p/x/reports?status=open) — keeps filters shareable and in history. */
-export function useHashQuery(): [URLSearchParams, (next: Record<string, string | undefined>) => void] {
+/** Query string inside the hash route. A list value sets the key several times (a filter with several values). */
+export function useHashQuery(): [URLSearchParams, (next: Record<string, string | string[] | undefined>) => void] {
   const [hash, setHash] = useState(() => location.hash);
   useEffect(() => {
     const on = () => setHash(location.hash);
@@ -91,11 +92,11 @@ export function useHashQuery(): [URLSearchParams, (next: Record<string, string |
     return () => window.removeEventListener('hashchange', on);
   }, []);
   const params = new URLSearchParams(hash.split('?')[1] ?? '');
-  const update = (next: Record<string, string | undefined>) => {
+  const update = (next: Record<string, string | string[] | undefined>) => {
     const merged = new URLSearchParams(location.hash.split('?')[1] ?? '');
     for (const [k, v] of Object.entries(next)) {
-      if (v === undefined || v === '') merged.delete(k);
-      else merged.set(k, v);
+      merged.delete(k);
+      for (const value of Array.isArray(v) ? v : [v]) if (value !== undefined && value !== '') merged.append(k, value);
     }
     const base = location.hash.split('?')[0];
     const qs = merged.toString();
