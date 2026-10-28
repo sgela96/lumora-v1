@@ -39,7 +39,7 @@ function report(key: string, payload: object, origin?: string) {
   form.append('key', key);
   form.append('payload', JSON.stringify(payload));
   form.append('screenshot', new Blob([Buffer.from('89504e470d0a1a0a', 'hex')], { type: 'image/png' }), 'screenshot.png');
-  return fetch(`${base}/api/widget/reports`, { method: 'POST', body: form, headers: origin ? { Origin: origin } : {} });
+  return fetch(`${base}/api/widget/reports?key=${encodeURIComponent(key)}`, { method: 'POST', body: form, headers: origin ? { Origin: origin } : {} });
 }
 
 test('register → project → widget config → report → ticket', async () => {
@@ -509,4 +509,30 @@ test('dashboard: one layout per organization, set by the owner; Business metrics
   assert.equal(m.screenErrors[0].label, 'Insufficient access rights');
   assert.equal(m.screenErrors[0].value, 3);
   assert.equal(m.byToolStatus[0].label, 'Open');
+});
+
+test('reports: filters take several values; the owner sets the default display for everyone', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Lin', company: 'Linearish', email: 'lin@linearish.test', password: 'password123' } });
+  await call('/api/billing/dev-plan', { body: { plan: 'business' } });
+  const [project] = (await call('/api/projects')).body;
+  for (const category of ['Bug', 'Idea', 'Question']) {
+    assert.equal((await report(project.publicKey, { kind: 'describe', fields: { category, description: `A ${category}` }, reporter: {}, metadata: {} })).status, 201);
+  }
+  const both = (await call(`/api/projects/${project.id}/tickets?category=Bug&category=Idea`)).body;
+  assert.equal(both.total, 2);
+  const { run } = await import('../src/db');
+  run("UPDATE tickets SET priority = 'high' WHERE project_id = ? AND category = 'Bug'", project.id);
+  assert.equal((await call(`/api/projects/${project.id}/tickets?priority=high&priority=none`)).body.total, 3);
+  assert.equal((await call(`/api/projects/${project.id}/tickets?priority=none`)).body.total, 2);
+
+  assert.equal((await call('/api/projects')).body[0].reportDisplay.layout, 'list');
+  const saved = await call(`/api/projects/${project.id}/report-display`, { method: 'PUT', body: { display: { layout: 'board', groupBy: 'priority', properties: ['id', 'priority', 'nope'] } } });
+  assert.equal(saved.status, 200);
+  const display = (await call('/api/projects')).body[0].reportDisplay;
+  assert.equal(display.layout, 'board');
+  assert.equal(display.groupBy, 'priority');
+  assert.deepEqual(display.properties, ['id', 'priority']);
+  await call(`/api/projects/${project.id}/report-display`, { method: 'PUT', body: { display: null } });
+  assert.equal((await call('/api/projects')).body[0].reportDisplay.layout, 'list');
 });

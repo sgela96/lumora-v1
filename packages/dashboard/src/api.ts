@@ -1,4 +1,4 @@
-import type { Addon, AddonId, DashboardItem, AddonQuantities, IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
+import type { Addon, AddonId, DashboardItem, ReportDisplay, AddonQuantities, IntegrationCategory, IntegrationType, PlanId, PlanLimits, ProjectSettings, ReportPayload, TicketStatus } from '@lumora/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -75,6 +75,8 @@ export interface Project {
   installedAt: string | null;
   installedOrigin: string | null;
   firstReportAt: string | null;
+  /** The report display everyone starts from (set by the account owner). */
+  reportDisplay: ReportDisplay;
 }
 
 export interface Integration {

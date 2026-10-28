@@ -1,9 +1,12 @@
-import type { TicketStatus } from '@lumora/shared';
-import { useEffect, useMemo, useState, type DragEvent, type ReactElement, type ReactNode } from 'react';
+import { DEFAULT_REPORT_DISPLAY, sameDisplay, sanitizeReportDisplay, type ReportDisplay, type ReportGroupBy, type ReportProperty, type TicketStatus } from '@lumora/shared';
+import { useCallback, useEffect, useMemo, useState, type DragEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { api, PRIORITIES, type IssueGroup, type Priority, type Project, type RemoteStatus, type SavedView, type TicketList, type TicketSummary, type Workflow } from '../api';
 import { Icons, LogoTile } from '../components/icons';
-import { Avatar, Nebula, PageHead, PriorityIcon, priorityLabel, PriorityPicker, Segmented, StatusBadge, StatusPicker, timeAgo, useDismiss, useToast } from '../components/ui';
-import { navigate, useApp, useHashQuery, useWorkflow } from '../state';
+import { DisplayMenu, FilterChips, FilterMenu, type FilterField } from '../components/ReportToolbar';
+import { Avatar, Nebula, PriorityIcon, priorityLabel, PriorityPicker, Segmented, StatusBadge, StatusPicker, timeAgo, useDismiss, useToast } from '../components/ui';
+import { useApp, useHashQuery, useWorkflow } from '../state';
+import { createPortal } from 'react-dom';
+import { TicketPage } from './Ticket';
 
 const KIND: Record<string, { icon: (p: { size?: number }) => ReactElement; label: string }> = {
   screenshot: { icon: Icons.camera, label: 'Screenshot' },
@@ -12,11 +15,12 @@ const KIND: Record<string, { icon: (p: { size?: number }) => ReactElement; label
 };
 
 const PAGE = 50;
+/** Filters in the URL; every one but `range` and the flags can hold several values. */
 const FILTER_KEYS = ['category', 'kind', 'browser', 'page', 'issue', 'range', 'hasErrors', 'hasRecording', 'delivery', 'priority', 'assignee', 'external', 'q'] as const;
-/** Everything a saved view stores in its query (filters, status, sort). */
-const VIEW_KEYS = [...FILTER_KEYS, 'status', 'sort'] as const;
+/** What a saved view stores in its query: the filters and the status tab. */
+const VIEW_KEYS = [...FILTER_KEYS, 'status'] as const;
 
-type ColumnId = 'status' | 'priority' | 'assignee' | 'linked' | 'category' | 'page' | 'browser' | 'reporter' | 'received';
+type ColumnId = Exclude<ReportProperty, 'id' | 'errors'>;
 const COLUMNS: { id: ColumnId; label: string; num?: boolean }[] = [
   { id: 'status', label: 'Status' },
   { id: 'priority', label: 'Priority' },
@@ -28,44 +32,45 @@ const COLUMNS: { id: ColumnId; label: string; num?: boolean }[] = [
   { id: 'reporter', label: 'Reporter' },
   { id: 'received', label: 'Received', num: true },
 ];
-const DEFAULT_COLUMNS: ColumnId[] = ['status', 'priority', 'assignee', 'linked', 'received'];
 const BASIC_COLUMNS: ColumnId[] = ['linked', 'reporter', 'received'];
-const COLUMNS_KEY = 'lumora-report-columns';
+const displayKey = (projectId: string) => `lumora-report-display:${projectId}`;
 
-type GroupBy = 'status' | 'priority' | 'category' | 'assignee';
-
-function storedColumns(): ColumnId[] {
+/** Your own display for this app, or the one the owner set for everyone. */
+function storedDisplay(project: Project): ReportDisplay {
+  const base = project.reportDisplay ?? DEFAULT_REPORT_DISPLAY;
   try {
-    const saved = JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? 'null');
-    if (Array.isArray(saved)) return saved.filter((c) => COLUMNS.some((k) => k.id === c));
+    const saved = localStorage.getItem(displayKey(project.id));
+    if (saved) return sanitizeReportDisplay(JSON.parse(saved), base);
   } catch {
     /* private mode */
   }
-  return DEFAULT_COLUMNS;
+  return base;
 }
 
 export function ReportsPage({ project }: { project: Project }) {
-  const { me } = useApp();
+  const { me, updateProject } = useApp();
   const toast = useToast();
   const supportCenter = me.limits.features.supportCenter;
   const workflow = useWorkflow(project.id, supportCenter);
   const [params, setParams] = useHashQuery();
-  const mode = supportCenter ? ((params.get('mode') as 'list' | 'board' | 'issues' | null) ?? 'list') : 'list';
-  const groupBy = (params.get('group') as GroupBy | null) ?? 'status';
-  const status = (supportCenter && mode === 'list' ? params.get('status') ?? 'open' : 'all') as TicketStatus | 'all';
+  const [display, setDisplayState] = useState<ReportDisplay>(() => storedDisplay(project));
+  const layout = supportCenter ? display.layout : 'list';
+  const status = (supportCenter && layout === 'list' ? params.get('status') ?? 'open' : 'all') as TicketStatus | 'all';
+  const openId = params.get('open');
   const [list, setList] = useState<TicketList | null>(null);
   const [issues, setIssues] = useState<IssueGroup[] | null>(null);
   const [limit, setLimit] = useState(PAGE);
   const [search, setSearch] = useState(params.get('q') ?? '');
-  const [columns, setColumnsState] = useState<ColumnId[]>(storedColumns);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [views, setViews] = useState<SavedView[]>([]);
   const [reload, setReload] = useState(0);
+  const orgDefault = project.reportDisplay ?? DEFAULT_REPORT_DISPLAY;
 
-  const setColumns = (next: ColumnId[]) => {
-    setColumnsState(next);
+  const setDisplay = (next: ReportDisplay) => {
+    setDisplayState(next);
     try {
-      localStorage.setItem(COLUMNS_KEY, JSON.stringify(next));
+      if (sameDisplay(next, orgDefault)) localStorage.removeItem(displayKey(project.id));
+      else localStorage.setItem(displayKey(project.id), JSON.stringify(next));
     } catch {
       /* private mode */
     }
@@ -73,20 +78,21 @@ export function ReportsPage({ project }: { project: Project }) {
 
   const query = new URLSearchParams();
   if (status !== 'all') query.set('status', status);
-  if (params.get('sort')) query.set('sort', params.get('sort')!);
+  if (display.ordering !== 'newest') query.set('sort', display.ordering);
   for (const k of FILTER_KEYS) {
-    const v = params.get(k);
-    if (!v) continue;
-    if (k === 'range') query.set('from', new Date(Date.now() - Number(v) * 86400_000).toISOString().slice(0, 10));
-    else query.set(k, v);
+    for (const v of params.getAll(k)) {
+      if (!v) continue;
+      if (k === 'range') query.set('from', new Date(Date.now() - Number(v) * 86400_000).toISOString().slice(0, 10));
+      else query.append(k, v);
+    }
   }
   const queryString = query.toString();
-  const pageSize = mode === 'board' ? 200 : limit;
+  const pageSize = layout === 'board' ? 200 : limit;
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      if (mode === 'issues') return api<IssueGroup[]>(`/projects/${project.id}/issues?${queryString}`).then((r) => !cancelled && setIssues(r));
+      if (layout === 'issues') return api<IssueGroup[]>(`/projects/${project.id}/issues?${queryString}`).then((r) => !cancelled && setIssues(r));
       return api<TicketList>(`/projects/${project.id}/tickets?${queryString}&limit=${pageSize}`).then((r) => !cancelled && setList(r));
     };
     load();
@@ -96,7 +102,7 @@ export function ReportsPage({ project }: { project: Project }) {
       cancelled = true;
       clearInterval(poll);
     };
-  }, [project.id, queryString, mode, pageSize, reload]);
+  }, [project.id, queryString, layout, pageSize, reload]);
 
   useEffect(() => {
     if (supportCenter) api<SavedView[]>(`/projects/${project.id}/views`).then(setViews, () => {});
@@ -108,31 +114,31 @@ export function ReportsPage({ project }: { project: Project }) {
   }, [search]);
 
   // The selection only makes sense for what's on screen.
-  useEffect(() => setSelected(new Set()), [queryString, mode]);
+  useEffect(() => setSelected(new Set()), [queryString, layout]);
 
-  const activeFilters = FILTER_KEYS.filter((k) => k !== 'q' && params.get(k));
   const counts = list?.counts;
-  const shownColumns = supportCenter ? COLUMNS.filter((c) => columns.includes(c.id)) : COLUMNS.filter((c) => BASIC_COLUMNS.includes(c.id));
+  const allColumns = supportCenter ? COLUMNS.filter((c) => display.properties.includes(c.id)) : COLUMNS.filter((c) => BASIC_COLUMNS.includes(c.id));
+  // With the report open beside the list, the list keeps only what fits: the title, status and priority.
+  const columns = openId ? allColumns.filter((c) => c.id === 'status' || c.id === 'priority') : allColumns;
+  const fields = useMemo(() => filterFields(params, list, workflow), [params.toString(), list?.facets, workflow]);
+  const filtering = fields.some((f) => f.values.length) || !!params.get('issue');
 
-  // The view that matches the current query exactly is highlighted.
+  // The saved view that matches what's on screen is highlighted.
   const currentViewQuery = viewQuery(params);
-  const activeView = views.find((v) => v.query === currentViewQuery && (v.layout.mode ?? 'list') === mode && (mode !== 'board' || (v.layout.groupBy ?? 'status') === groupBy));
+  const activeView = views.find((v) => v.query === currentViewQuery && sameDisplay(sanitizeReportDisplay(v.layout, orgDefault), display));
+  const pristine = !currentViewQuery && sameDisplay(display, orgDefault);
 
   const applyView = (v: SavedView | null) => {
-    const next: Record<string, string | undefined> = Object.fromEntries(VIEW_KEYS.map((k) => [k, undefined]));
-    if (v) for (const [k, val] of new URLSearchParams(v.query)) next[k] = val;
-    next.mode = v?.layout.mode && v.layout.mode !== 'list' ? v.layout.mode : undefined;
-    next.group = v?.layout.groupBy;
-    setParams(next);
-    setSearch(next.q ?? '');
-    if (v?.layout.columns?.length) setColumns(v.layout.columns as ColumnId[]);
+    const next: Record<string, string | string[] | undefined> = Object.fromEntries(VIEW_KEYS.map((k) => [k, undefined]));
+    if (v) for (const k of new URLSearchParams(v.query).keys()) next[k] = new URLSearchParams(v.query).getAll(k);
+    setParams({ ...next, open: undefined });
+    setSearch(typeof next.q === 'string' ? next.q : next.q?.[0] ?? '');
+    setDisplay(v ? sanitizeReportDisplay(v.layout, orgDefault) : orgDefault);
     setLimit(PAGE);
   };
 
   const saveView = async (name: string) => {
-    const view = await api<SavedView>(`/projects/${project.id}/views`, {
-      body: { name, query: currentViewQuery, layout: { mode, groupBy: mode === 'board' ? groupBy : undefined, columns } },
-    });
+    const view = await api<SavedView>(`/projects/${project.id}/views`, { body: { name, query: currentViewQuery, layout: display } });
     setViews([...views, view]);
     toast(`Saved “${name}”`);
   };
@@ -140,6 +146,21 @@ export function ReportsPage({ project }: { project: Project }) {
   const deleteView = async (v: SavedView) => {
     await api(`/views/${v.id}`, { method: 'DELETE', body: {} });
     setViews(views.filter((x) => x.id !== v.id));
+  };
+
+  const setDefaultForEveryone = async () => {
+    try {
+      const r = await api<{ display: ReportDisplay }>(`/projects/${project.id}/report-display`, { method: 'PUT', body: { display } });
+      updateProject({ ...project, reportDisplay: r.display });
+      try {
+        localStorage.removeItem(displayKey(project.id));
+      } catch {
+        /* private mode */
+      }
+      toast('This is now the default display for everyone');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), true);
+    }
   };
 
   const bulk = async (patch: object, label: string) => {
@@ -157,20 +178,165 @@ export function ReportsPage({ project }: { project: Project }) {
   };
 
   const statusPatch = (s: RemoteStatus) => (workflow?.source === 'tool' ? { externalStatus: s.name } : { status: s.category });
+  const open = useCallback((id: string | null) => setParams({ open: id ?? undefined }), [setParams]);
+  // Board and list share the order of what's on screen, for the panel's previous / next.
+  const ordered = list?.items ?? [];
+
+  const content =
+    layout === 'issues' ? (
+      <section className="card">
+        <IssuesTable issues={issues} onOpen={(i) => {
+          setParams({ issue: i.fingerprint, status: 'all' });
+          setDisplay({ ...display, layout: 'list' });
+        }} />
+      </section>
+    ) : !list ? (
+      <section className="card">
+        <div className="empty muted">Loading…</div>
+      </section>
+    ) : list.items.length === 0 && layout === 'list' ? (
+      <section className="card">
+        <EmptyState project={project} filtered={filtering || !!params.get('q') || status !== 'all'} />
+      </section>
+    ) : layout === 'board' ? (
+      <Board
+        items={display.showResolved ? list.items : list.items.filter((t) => t.status !== 'resolved')}
+        groupBy={display.groupBy}
+        properties={display.properties}
+        showEmpty={display.showEmptyGroups}
+        showResolved={display.showResolved}
+        workflow={workflow}
+        facets={list.facets}
+        openId={openId}
+        onOpen={open}
+        projectId={project.id}
+        onMove={async (t, patch) => {
+          setList({ ...list, items: list.items.map((x) => (x.id === t.id ? { ...x, ...optimistic(patch, workflow) } : x)) });
+          try {
+            await api(`/tickets/${t.id}`, { method: 'PATCH', body: patch });
+          } catch (e) {
+            toast(e instanceof Error ? e.message : String(e), true);
+          }
+          setReload((n) => n + 1);
+        }}
+      />
+    ) : (
+      <section className="card">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead>
+              <tr>
+                {supportCenter && (
+                  <th className="check-cell">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all"
+                      checked={selected.size > 0 && selected.size === list.items.length}
+                      ref={(el) => void (el && (el.indeterminate = selected.size > 0 && selected.size < list.items.length))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set(list.items.map((t) => t.id)) : new Set())}
+                    />
+                  </th>
+                )}
+                <th>Report</th>
+                {columns.map((c) => (
+                  <th key={c.id} className={c.num ? 'num' : undefined}>
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {list.items.map((t) => (
+                <ReportRow
+                  key={t.id}
+                  ticket={t}
+                  projectId={project.id}
+                  columns={columns.map((c) => c.id)}
+                  showId={!supportCenter || display.properties.includes('id')}
+                  showErrors={!supportCenter || display.properties.includes('errors')}
+                  selectable={supportCenter}
+                  selected={selected.has(t.id)}
+                  active={openId === t.id}
+                  onOpen={() => open(t.id)}
+                  onSelect={(on) => {
+                    const next = new Set(selected);
+                    if (on) next.add(t.id);
+                    else next.delete(t.id);
+                    setSelected(next);
+                  }}
+                  workflow={workflow}
+                  onPatch={async (patch) => {
+                    try {
+                      const updated = await api<TicketSummary>(`/tickets/${t.id}`, { method: 'PATCH', body: patch });
+                      setList({ ...list, items: list.items.map((x) => (x.id === t.id ? { ...x, ...updated } : x)) });
+                    } catch (e) {
+                      toast(e instanceof Error ? e.message : String(e), true);
+                    }
+                  }}
+                />
+              ))}
+            </tbody>
+          </table>
+          {list.total > list.items.length && (
+            <div style={{ textAlign: 'center', padding: 14 }}>
+              <button className="btn btn-sm" onClick={() => setLimit(limit + PAGE)}>
+                Show more ({list.total - list.items.length})
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    );
 
   return (
-    <div className="stack">
-      <PageHead
-        title="Reports"
-        subtitle={supportCenter ? 'Every report from your app, with its live status in your ticketing tools.' : `Reports from the last ${list?.historyDays ?? me.limits.historyDays} days.`}
-        actions={<input className="input input-search" placeholder="Search" aria-label="Search reports" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 240 }} />}
-      />
+    <div className="stack reports-page">
+      <header className="reports-head">
+        <div className="reports-title">
+          <h1>Reports</h1>
+          {supportCenter && (
+            <div className="views-bar" role="tablist" aria-label="Saved views">
+              <button role="tab" aria-selected={!activeView && pristine} className="view-tab" onClick={() => applyView(null)}>
+                All reports
+              </button>
+              {views.map((v) => (
+                <span key={v.id} className="view-tab-wrap">
+                  <button role="tab" aria-selected={activeView?.id === v.id} className="view-tab" onClick={() => applyView(v)}>
+                    {sanitizeReportDisplay(v.layout).layout === 'board' ? <Icons.board size={14} /> : <Icons.bookmark size={14} />}
+                    {v.name}
+                  </button>
+                  <button className="view-remove" aria-label={`Delete view ${v.name}`} title="Delete view" onClick={() => deleteView(v)}>
+                    <Icons.x size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="reports-tools">
+          <label className="search-pill">
+            <Icons.search size={15} />
+            <input placeholder="Search" aria-label="Search reports" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </label>
+          {supportCenter && layout !== 'issues' && <FilterMenu fields={fields} apply={setParams} />}
+          {supportCenter && (
+            <DisplayMenu
+              display={display}
+              onChange={setDisplay}
+              isDefault={sameDisplay(display, orgDefault)}
+              statusLabel={workflow?.source === 'tool' ? `${workflow.tool!.name} status` : 'Status'}
+              canSetDefault={me.dashboard.canEdit}
+              onSetDefault={setDefaultForEveryone}
+              onReset={() => setDisplay(orgDefault)}
+            />
+          )}
+        </div>
+      </header>
 
       {!supportCenter && (
         <div className="notice notice-accent spread" style={{ gap: 12, flexWrap: 'wrap' }}>
           <span>
             Every report from the last {list?.historyDays ?? me.limits.historyDays} days, with its screenshot, steps and console. <strong>Business</strong> adds statuses synced
-            from your tools, priorities, a board, saved views and similar reports grouped into issues.
+            from your tools, filters, a board, saved views and similar reports grouped into issues.
           </span>
           <a className="btn btn-sm" href="#/billing" style={{ textDecoration: 'none' }}>
             See Business
@@ -179,28 +345,8 @@ export function ReportsPage({ project }: { project: Project }) {
       )}
 
       {supportCenter && (
-        <div className="views-bar" role="tablist" aria-label="Saved views">
-          <button role="tab" aria-selected={!activeView && !currentViewQuery && mode === 'list'} className="view-tab" onClick={() => applyView(null)}>
-            All reports
-          </button>
-          {views.map((v) => (
-            <span key={v.id} className="view-tab-wrap">
-              <button role="tab" aria-selected={activeView?.id === v.id} className="view-tab" onClick={() => applyView(v)}>
-                {v.layout.mode === 'board' ? <Icons.board size={14} /> : <Icons.bookmark size={14} />}
-                {v.name}
-              </button>
-              <button className="view-remove" aria-label={`Delete view ${v.name}`} title="Delete view" onClick={() => deleteView(v)}>
-                <Icons.x size={12} />
-              </button>
-            </span>
-          ))}
-          {!activeView && (currentViewQuery || mode !== 'list') && <SaveViewButton onSave={saveView} />}
-        </div>
-      )}
-
-      {supportCenter && (
-        <div className="spread" style={{ flexWrap: 'wrap' }}>
-          {mode === 'list' ? (
+        <div className="reports-sub">
+          {layout === 'list' && (
             <Segmented
               label="Status"
               value={status}
@@ -215,36 +361,15 @@ export function ReportsPage({ project }: { project: Project }) {
                 { value: 'all', label: 'All', count: counts?.all },
               ]}
             />
-          ) : mode === 'board' ? (
-            <div className="row small" style={{ gap: 8, flexWrap: 'nowrap' }}>
-              <span className="muted">Group by</span>
-              <select className="select select-sm" aria-label="Group by" value={groupBy} onChange={(e) => setParams({ group: e.target.value === 'status' ? undefined : e.target.value })}>
-                <option value="status">{workflow?.source === 'tool' ? `${workflow.tool!.name} status` : 'Status'}</option>
-                <option value="priority">Priority</option>
-                <option value="category">Category</option>
-                <option value="assignee">Assignee</option>
-              </select>
-            </div>
-          ) : (
-            <span />
           )}
-          <div className="row">
-            {mode === 'list' && <ColumnChooser columns={columns} onChange={setColumns} />}
-            <Segmented
-              label="Layout"
-              value={mode}
-              onChange={(v) => setParams({ mode: v === 'list' ? undefined : v, status: v === 'list' ? params.get('status') ?? undefined : undefined })}
-              options={[
-                { value: 'list', label: <><Icons.list size={14} /> List</> },
-                { value: 'board', label: <><Icons.board size={14} /> Board</> },
-                { value: 'issues', label: <><Icons.layers size={14} /> Issues</> },
-              ]}
-            />
-          </div>
+          <FilterChips
+            fields={layout === 'issues' ? [] : fields}
+            apply={setParams}
+            onClear={() => setParams(Object.fromEntries(FILTER_KEYS.filter((k) => k !== 'q').map((k) => [k, undefined])))}
+            trailing={!activeView && !pristine ? <SaveViewButton onSave={saveView} /> : undefined}
+          />
         </div>
       )}
-
-      {supportCenter && mode !== 'issues' && <Filters list={list} params={params} setParams={setParams} activeFilters={activeFilters} workflow={workflow} />}
 
       {params.get('issue') && list?.items[0]?.issue && (
         <div className="notice spread">
@@ -257,112 +382,10 @@ export function ReportsPage({ project }: { project: Project }) {
         </div>
       )}
 
-      {mode === 'issues' ? (
-        <section className="card">
-          <IssuesTable issues={issues} onOpen={(i) => setParams({ mode: undefined, issue: i.fingerprint, status: 'all' })} />
-        </section>
-      ) : !list ? (
-        <section className="card">
-          <div className="empty muted">Loading…</div>
-        </section>
-      ) : list.items.length === 0 && mode === 'list' ? (
-        <section className="card">
-          <EmptyState project={project} filtered={activeFilters.length > 0 || !!params.get('q') || status !== 'all'} />
-        </section>
-      ) : mode === 'board' ? (
-        <Board
-          items={list.items}
-          projectId={project.id}
-          groupBy={groupBy}
-          workflow={workflow}
-          facets={list.facets}
-          onMove={async (t, patch) => {
-            setList({ ...list, items: list.items.map((x) => (x.id === t.id ? { ...x, ...optimistic(patch, workflow) } : x)) });
-            try {
-              await api(`/tickets/${t.id}`, { method: 'PATCH', body: patch });
-            } catch (e) {
-              toast(e instanceof Error ? e.message : String(e), true);
-            }
-            setReload((n) => n + 1);
-          }}
-        />
-      ) : (
-        <section className="card">
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  {supportCenter && (
-                    <th className="check-cell">
-                      <input
-                        type="checkbox"
-                        aria-label="Select all"
-                        checked={selected.size > 0 && selected.size === list.items.length}
-                        ref={(el) => void (el && (el.indeterminate = selected.size > 0 && selected.size < list.items.length))}
-                        onChange={(e) => setSelected(e.target.checked ? new Set(list.items.map((t) => t.id)) : new Set())}
-                      />
-                    </th>
-                  )}
-                  <th>
-                    {supportCenter ? (
-                      <button className="th-sort" onClick={() => setParams({ sort: params.get('sort') === 'oldest' ? undefined : 'oldest' })}>
-                        Report {params.get('sort') === 'oldest' ? <Icons.chevronUp size={12} /> : params.get('sort') ? null : <Icons.chevronDown size={12} />}
-                      </button>
-                    ) : (
-                      'Report'
-                    )}
-                  </th>
-                  {shownColumns.map((c) => (
-                    <th key={c.id} className={c.num ? 'num' : undefined}>
-                      {c.id === 'priority' ? (
-                        <button className="th-sort" onClick={() => setParams({ sort: params.get('sort') === 'priority' ? undefined : 'priority' })}>
-                          Priority {params.get('sort') === 'priority' && <Icons.chevronDown size={12} />}
-                        </button>
-                      ) : (
-                        c.label
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {list.items.map((t) => (
-                  <ReportRow
-                    key={t.id}
-                    ticket={t}
-                    projectId={project.id}
-                    columns={shownColumns.map((c) => c.id)}
-                    selectable={supportCenter}
-                    selected={selected.has(t.id)}
-                    onSelect={(on) => {
-                      const next = new Set(selected);
-                      if (on) next.add(t.id);
-                      else next.delete(t.id);
-                      setSelected(next);
-                    }}
-                    workflow={workflow}
-                    onPatch={async (patch) => {
-                      try {
-                        const updated = await api<TicketSummary>(`/tickets/${t.id}`, { method: 'PATCH', body: patch });
-                        setList({ ...list, items: list.items.map((x) => (x.id === t.id ? { ...x, ...updated } : x)) });
-                      } catch (e) {
-                        toast(e instanceof Error ? e.message : String(e), true);
-                      }
-                    }}
-                  />
-                ))}
-              </tbody>
-            </table>
-            {list.total > list.items.length && (
-              <div style={{ textAlign: 'center', padding: 14 }}>
-                <button className="btn btn-sm" onClick={() => setLimit(limit + PAGE)}>
-                  Show more ({list.total - list.items.length})
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      <div className={`reports-body${openId ? ' with-panel' : ''}`}>
+        <div className="reports-content">{content}</div>
+        {openId && <ReportPanel project={project} ticketId={openId} order={ordered} onOpen={open} onChanged={() => setReload((n) => n + 1)} />}
+      </div>
 
       {selected.size > 0 && (
         <div className="bulk-bar card" role="toolbar" aria-label="Bulk actions">
@@ -378,13 +401,151 @@ export function ReportsPage({ project }: { project: Project }) {
   );
 }
 
-/** The filter and sort part of the hash query, in a stable order, as a saved view stores it. */
+/** The report beside the list, like Jira: previous / next, open as a page, close. */
+function ReportPanel({ project, ticketId, order, onOpen, onChanged }: { project: Project; ticketId: string; order: TicketSummary[]; onOpen: (id: string | null) => void; onChanged: () => void }) {
+  const index = order.findIndex((t) => t.id === ticketId);
+  const prev = index > 0 ? order[index - 1] : null;
+  const next = index >= 0 && index < order.length - 1 ? order[index + 1] : null;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (/input|textarea|select/i.test(target.tagName) || target.isContentEditable || document.querySelector('.modal-scrim, .lu-annotator')) return;
+      if (e.key === 'Escape') onOpen(null);
+      else if ((e.key === 'k' || e.key === 'ArrowUp') && prev) {
+        e.preventDefault();
+        onOpen(prev.id);
+      } else if ((e.key === 'j' || e.key === 'ArrowDown') && next) {
+        e.preventDefault();
+        onOpen(next.id);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [prev, next, onOpen]);
+
+  // On narrow screens the panel becomes a drawer over the page, outside the main column's stacking context.
+  const narrow = useMediaQuery('(max-width: 1100px)');
+  const panel = (
+    <aside className={`report-panel card${narrow ? ' drawer-mode' : ''}`} aria-label="Report">
+      <div className="report-panel-bar">
+        <div className="row" style={{ gap: 4 }}>
+          <button type="button" className="icon-btn icon-btn-sm" aria-label="Previous report" title="Previous (K)" disabled={!prev} onClick={() => prev && onOpen(prev.id)}>
+            <Icons.chevronUp size={15} />
+          </button>
+          <button type="button" className="icon-btn icon-btn-sm" aria-label="Next report" title="Next (J)" disabled={!next} onClick={() => next && onOpen(next.id)}>
+            <Icons.chevronDown size={15} />
+          </button>
+          {index >= 0 && (
+            <span className="muted small" style={{ marginLeft: 6 }}>
+              {index + 1} of {order.length}
+            </span>
+          )}
+        </div>
+        <div className="row" style={{ gap: 4 }}>
+          <a className="icon-btn icon-btn-sm" href={`#/p/${project.id}/reports/${ticketId}`} aria-label="Open as a page" title="Open as a page">
+            <Icons.expand size={14} />
+          </a>
+          <button type="button" className="icon-btn icon-btn-sm" aria-label="Close" title="Close (Esc)" onClick={() => onOpen(null)}>
+            <Icons.x size={15} />
+          </button>
+        </div>
+      </div>
+      <div className="report-panel-body">
+        <TicketPage key={ticketId} project={project} ticketId={ticketId} embedded={{ onChanged }} />
+      </div>
+    </aside>
+  );
+  return narrow ? createPortal(panel, document.body) : panel;
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const on = () => setMatches(media.matches);
+    media.addEventListener('change', on);
+    return () => media.removeEventListener('change', on);
+  }, [query]);
+  return matches;
+}
+
+/** Builds the filter menu's fields from the URL, the list's facets and the connected tool's workflow. */
+function filterFields(params: URLSearchParams, list: TicketList | null, workflow: Workflow | null): FilterField[] {
+  const multi = (key: string) => ({ values: params.getAll(key).filter(Boolean), set: (values: string[]) => ({ [key]: values }) });
+  const facet = (k: keyof TicketList['facets']) => (list?.facets[k] ?? []).map((f) => ({ value: f.value, label: f.value, count: f.n }));
+  const flags = [
+    { value: 'errors', label: 'With console errors', key: 'hasErrors', on: '1' },
+    { value: 'recording', label: 'With a recording', key: 'hasRecording', on: '1' },
+    { value: 'failed', label: 'Delivery failed', key: 'delivery', on: 'failed' },
+  ];
+  const fields: FilterField[] = [];
+  if (workflow?.source === 'tool')
+    fields.push({
+      id: 'external',
+      label: `${workflow.tool!.name} status`,
+      icon: <Icons.status size={15} />,
+      options: workflow.statuses.map((s) => ({ value: s.name, label: s.name, icon: <StatusDot status={s.category} />, count: list?.facets.external.find((f) => f.value === s.name)?.n })),
+      ...multi('external'),
+    });
+  fields.push(
+    {
+      id: 'priority',
+      label: 'Priority',
+      icon: <PriorityIcon priority="high" size={15} />,
+      options: [...PRIORITIES, null].map((p) => ({ value: p ?? 'none', label: priorityLabel(p), icon: <PriorityIcon priority={p} /> })),
+      ...multi('priority'),
+    },
+    {
+      id: 'assignee',
+      label: 'Assignee',
+      icon: <Icons.user size={15} />,
+      options: [...facet('assignee').map((o) => ({ ...o, icon: <Avatar name={o.label} size={18} /> })), { value: 'none', label: 'Unassigned' }],
+      ...multi('assignee'),
+    },
+    { id: 'category', label: 'Category', icon: <Icons.tag size={15} />, options: [...facet('category'), { value: 'none', label: 'No category' }], ...multi('category') },
+    {
+      id: 'kind',
+      label: 'Capture',
+      icon: <Icons.camera size={15} />,
+      options: Object.entries(KIND).map(([value, k]) => ({ value, label: k.label, icon: <k.icon size={14} /> })),
+      ...multi('kind'),
+    },
+    { id: 'page', label: 'Page', icon: <Icons.file size={15} />, options: facet('page'), ...multi('page') },
+    { id: 'browser', label: 'Browser', icon: <Icons.monitor size={15} />, options: facet('browser'), ...multi('browser') },
+    {
+      id: 'received',
+      label: 'Received',
+      icon: <Icons.calendar size={15} />,
+      single: true,
+      options: [
+        { value: '1', label: 'Last 24 hours' },
+        { value: '7', label: 'Last 7 days' },
+        { value: '30', label: 'Last 30 days' },
+      ],
+      values: params.get('range') ? [params.get('range')!] : [],
+      set: (values) => ({ range: values[0] }),
+    },
+    {
+      id: 'details',
+      label: 'Details',
+      icon: <Icons.alert size={15} />,
+      options: flags.map((f) => ({ value: f.value, label: f.label })),
+      values: flags.filter((f) => params.get(f.key) === f.on).map((f) => f.value),
+      set: (values) => Object.fromEntries(flags.map((f) => [f.key, values.includes(f.value) ? f.on : undefined])),
+    },
+  );
+  return fields;
+}
+
+function StatusDot({ status }: { status: TicketStatus }) {
+  return <span className={`status-dot ${status === 'open' ? 'ring' : status === 'in_progress' ? 'half' : ''} status-${status}`} aria-hidden />;
+}
+
+/** The filter part of the hash query, in a stable order, as a saved view stores it. */
 function viewQuery(params: URLSearchParams): string {
   const q = new URLSearchParams();
-  for (const k of VIEW_KEYS) {
-    const v = params.get(k);
-    if (v) q.set(k, v);
-  }
+  for (const k of VIEW_KEYS) for (const v of params.getAll(k)) if (v) q.append(k, v);
   return q.toString();
 }
 
@@ -405,13 +566,13 @@ function SaveViewButton({ onSave }: { onSave: (name: string) => Promise<void> })
   const [name, setName] = useState('');
   const ref = useDismiss(open, () => setOpen(false));
   return (
-    <div className="status-picker" ref={ref}>
-      <button className="view-tab view-add" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <Icons.plus size={14} /> Save view
+    <div className="tb-pop" ref={ref}>
+      <button className="btn btn-sm btn-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <Icons.bookmark size={14} /> Save view
       </button>
       {open && (
         <form
-          className="status-menu card align-left stack-sm"
+          className="menu-pop align-end stack-sm"
           style={{ padding: 12, width: 260 }}
           onSubmit={async (e) => {
             e.preventDefault();
@@ -425,7 +586,7 @@ function SaveViewButton({ onSave }: { onSave: (name: string) => Promise<void> })
             Name this view
           </label>
           <input id="view-name" className="input" autoFocus placeholder="Urgent bugs on checkout" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-          <span className="muted small">Saves the filters, sort, layout and columns you see now.</span>
+          <span className="muted small">Saves the filters and display options you see now.</span>
           <button className="btn btn-primary btn-sm" style={{ alignSelf: 'end' }}>
             Save
           </button>
@@ -435,105 +596,9 @@ function SaveViewButton({ onSave }: { onSave: (name: string) => Promise<void> })
   );
 }
 
-function ColumnChooser({ columns, onChange }: { columns: ColumnId[]; onChange: (c: ColumnId[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismiss(open, () => setOpen(false));
-  return (
-    <div className="status-picker" ref={ref}>
-      <button className="btn btn-sm" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <Icons.columns size={14} /> Columns
-      </button>
-      {open && (
-        <div className="status-menu card align-right" role="group" aria-label="Columns">
-          <div className="menu-head">Show columns</div>
-          {COLUMNS.map((c) => {
-            const on = columns.includes(c.id);
-            return (
-              <label key={c.id} className="menu-check">
-                <input type="checkbox" checked={on} onChange={() => onChange(on ? columns.filter((x) => x !== c.id) : COLUMNS.map((k) => k.id).filter((id) => id === c.id || columns.includes(id)))} />
-                {c.label}
-              </label>
-            );
-          })}
-          <button className="menu-reset" onClick={() => onChange(DEFAULT_COLUMNS)}>
-            Reset to default
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Filters({
-  list,
-  params,
-  setParams,
-  activeFilters,
-  workflow,
-}: {
-  list: TicketList | null;
-  params: URLSearchParams;
-  setParams: (next: Record<string, string | undefined>) => void;
-  activeFilters: readonly string[];
-  workflow: Workflow | null;
-}) {
-  const select = (key: string, label: string, all: string, options: { value: string; label: string }[]) => (
-    <select className="select" aria-label={label} value={params.get(key) ?? ''} onChange={(e) => setParams({ [key]: e.target.value })}>
-      <option value="">{all}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
-  const facet = (k: keyof TicketList['facets']) => (list?.facets[k] ?? []).map((f) => ({ value: f.value, label: f.value }));
-  return (
-    <div className="filters">
-      {workflow?.source === 'tool' && select('external', `${workflow.tool!.name} status`, `Any ${workflow.tool!.name} status`, workflow.statuses.map((s) => ({ value: s.name, label: s.name })))}
-      {select('priority', 'Priority', 'Any priority', [...PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) })), { value: 'none', label: 'No priority' }])}
-      {select('assignee', 'Assignee', 'Anyone', [...facet('assignee'), { value: 'none', label: 'Unassigned' }])}
-      {select('category', 'Category', 'All categories', facet('category'))}
-      {select('kind', 'Type', 'Any capture', [
-        { value: 'screenshot', label: 'Screenshot' },
-        { value: 'recording', label: 'Recording' },
-        { value: 'describe', label: 'Text only' },
-      ])}
-      {select('page', 'Page', 'All pages', facet('page'))}
-      {select('browser', 'Browser', 'All browsers', facet('browser'))}
-      {select('range', 'Date range', 'Any time', [
-        { value: '1', label: 'Last 24 hours' },
-        { value: '7', label: 'Last 7 days' },
-        { value: '30', label: 'Last 30 days' },
-      ])}
-      <select
-        className="select"
-        aria-label="More filters"
-        value={params.get('hasErrors') ? 'errors' : params.get('hasRecording') ? 'recording' : params.get('delivery') ? 'failed' : ''}
-        onChange={(e) =>
-          setParams({
-            hasErrors: e.target.value === 'errors' ? '1' : undefined,
-            hasRecording: e.target.value === 'recording' ? '1' : undefined,
-            delivery: e.target.value === 'failed' ? 'failed' : undefined,
-          })
-        }
-      >
-        <option value="">Everything</option>
-        <option value="errors">With console errors</option>
-        <option value="recording">With a recording</option>
-        <option value="failed">Delivery failed</option>
-      </select>
-      {activeFilters.length > 0 && (
-        <button className="btn btn-sm btn-ghost" onClick={() => setParams(Object.fromEntries(activeFilters.map((k) => [k, undefined])))}>
-          Clear filters
-        </button>
-      )}
-    </div>
-  );
-}
-
-function LinkedChip({ ticket: t }: { ticket: TicketSummary }) {
+function LinkedChip({ ticket: t, quiet }: { ticket: TicketSummary; quiet?: boolean }) {
   const linked = t.deliveries.find((d) => d.status === 'sent' && (d.displayId || d.externalId));
+  if (!linked && quiet) return null;
   if (linked)
     return (
       <span className="ref-chip" title={linked.name}>
@@ -549,8 +614,12 @@ function ReportRow({
   ticket: t,
   projectId,
   columns,
+  showId,
+  showErrors,
   selectable,
   selected,
+  active,
+  onOpen,
   onSelect,
   workflow,
   onPatch,
@@ -558,8 +627,13 @@ function ReportRow({
   ticket: TicketSummary;
   projectId: string;
   columns: ColumnId[];
+  showId: boolean;
+  showErrors: boolean;
   selectable: boolean;
   selected: boolean;
+  /** Open in the side panel. */
+  active: boolean;
+  onOpen: () => void;
   onSelect: (on: boolean) => void;
   workflow: Workflow | null;
   onPatch: (patch: object) => Promise<void>;
@@ -583,26 +657,26 @@ function ReportRow({
     received: <span className="muted small">{timeAgo(t.createdAt)}</span>,
   };
   return (
-    <tr className={`clickable${selected ? ' selected' : ''}`} onClick={() => navigate(`/p/${projectId}/reports/${t.id}`)}>
+    <tr className={`clickable${selected ? ' selected' : ''}${active ? ' active' : ''}`} onClick={onOpen} aria-current={active || undefined}>
       {selectable && (
         <td className="check-cell" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" aria-label={`Select ${t.reference}`} checked={selected} onChange={(e) => onSelect(e.target.checked)} />
         </td>
       )}
-      <td>
+      <td className="report-cell">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 12 }}>
           <span className="kind-icon" title={kind.label}>
             <kind.icon size={16} />
           </span>
           <div className="title-cell">
-            <a className="t" href={`#/p/${projectId}/reports/${t.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--text)' }}>
+            <a className="t" href={`#/p/${projectId}/reports/${t.id}`} onClick={(e) => openUnlessModified(e, onOpen)} style={{ color: 'var(--text)' }}>
               {t.title}
             </a>
             <span className="sub">
-              <span className="mono">{t.reference}</span>
-              {!columns.includes('category') && t.category && <span>· {t.category}</span>}
+              {showId && <span className="mono">{t.reference}</span>}
+              {!columns.includes('category') && t.category && <span>{showId ? '· ' : ''}{t.category}</span>}
               {!columns.includes('page') && t.pagePath && <span>· {t.pagePath}</span>}
-              {t.errorCount > 0 && (
+              {showErrors && t.errorCount > 0 && (
                 <span className="badge badge-danger" style={{ padding: '0 6px' }}>
                   {t.errorCount} error{t.errorCount > 1 ? 's' : ''}
                 </span>
@@ -624,13 +698,15 @@ function ReportRow({
 
 interface Lane {
   id: string;
+  /** For status lanes: the Lumora category, so resolved columns can be hidden. */
+  statusCategory?: TicketStatus;
   title: ReactNode;
   /** The change that moves a card into this lane; null when the lane can't be dropped on. */
   patch: Record<string, string> | null;
   match: (t: TicketSummary) => boolean;
 }
 
-function lanesFor(groupBy: GroupBy, workflow: Workflow | null, items: TicketSummary[], facets: TicketList['facets']): Lane[] {
+function lanesFor(groupBy: ReportGroupBy, workflow: Workflow | null, items: TicketSummary[], facets: TicketList['facets']): Lane[] {
   if (groupBy === 'priority')
     return [...PRIORITIES, null].map((p) => ({
       id: p ?? 'none',
@@ -669,27 +745,38 @@ function lanesFor(groupBy: GroupBy, workflow: Workflow | null, items: TicketSumm
   if (workflow?.source === 'tool' && statuses.length) {
     // A report without a tool status sits in the first status of its category.
     const home = (t: TicketSummary) => statuses.find((s) => s.name === t.externalStatus) ?? statuses.find((s) => s.category === t.status) ?? statuses[0];
-    return statuses.map((s) => ({ id: s.name, title: <StatusBadge status={s.category} label={s.name} />, patch: { externalStatus: s.name }, match: (t) => home(t).name === s.name }));
+    return statuses.map((s) => ({ id: s.name, statusCategory: s.category, title: <StatusBadge status={s.category} label={s.name} />, patch: { externalStatus: s.name }, match: (t) => home(t).name === s.name }));
   }
-  return (['open', 'in_progress', 'resolved'] as TicketStatus[]).map((s) => ({ id: s, title: <StatusBadge status={s} />, patch: { status: s }, match: (t) => t.status === s }));
+  return (['open', 'in_progress', 'resolved'] as TicketStatus[]).map((s) => ({ id: s, statusCategory: s, title: <StatusBadge status={s} />, patch: { status: s }, match: (t) => t.status === s }));
 }
 
 function Board({
   items,
   projectId,
   groupBy,
+  properties,
+  showEmpty,
+  showResolved,
   workflow,
   facets,
+  openId,
+  onOpen,
   onMove,
 }: {
   items: TicketSummary[];
   projectId: string;
-  groupBy: GroupBy;
+  groupBy: ReportGroupBy;
+  properties: ReportProperty[];
+  showEmpty: boolean;
+  showResolved: boolean;
   workflow: Workflow | null;
   facets: TicketList['facets'];
+  openId: string | null;
+  onOpen: (id: string) => void;
   onMove: (t: TicketSummary, patch: Record<string, string>) => void;
 }) {
-  const lanes = useMemo(() => lanesFor(groupBy, workflow, items, facets), [groupBy, workflow, items, facets]);
+  const allLanes = useMemo(() => lanesFor(groupBy, workflow, items, facets), [groupBy, workflow, items, facets]);
+  const show = (p: ReportProperty) => properties.includes(p);
   const [dragging, setDragging] = useState<TicketSummary | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
@@ -699,6 +786,11 @@ function Board({
     if (dragging && lane.patch && !lane.match(dragging)) onMove(dragging, lane.patch);
     setDragging(null);
   };
+
+  const lanes = allLanes.filter((lane) => {
+    if (!showResolved && groupBy === 'status' && lane.statusCategory === 'resolved') return false;
+    return showEmpty || !!dragging || items.some(lane.match);
+  });
 
   return (
     <div className="board" role="list">
@@ -730,7 +822,9 @@ function Board({
                 <a
                   key={t.id}
                   href={`#/p/${projectId}/reports/${t.id}`}
-                  className={`board-card${dragging?.id === t.id ? ' dragging' : ''}`}
+                  onClick={(e) => openUnlessModified(e, () => onOpen(t.id))}
+                  aria-current={openId === t.id || undefined}
+                  className={`board-card${dragging?.id === t.id ? ' dragging' : ''}${openId === t.id ? ' active' : ''}`}
                   draggable
                   onDragStart={(e) => {
                     e.dataTransfer.effectAllowed = 'move';
@@ -745,15 +839,25 @@ function Board({
                   <span className="board-card-title">{t.title}</span>
                   <span className="board-card-meta">
                     <span className="row" style={{ gap: 6, flexWrap: 'nowrap', minWidth: 0 }}>
-                      {groupBy !== 'priority' && <PriorityIcon priority={t.priority} />}
-                      <span className="mono muted">{t.reference}</span>
-                      {t.errorCount > 0 && <span className="badge badge-danger" style={{ padding: '0 6px' }}>{t.errorCount}</span>}
+                      {show('priority') && groupBy !== 'priority' && <PriorityIcon priority={t.priority} />}
+                      {show('id') && <span className="mono muted">{t.reference}</span>}
+                      {show('errors') && t.errorCount > 0 && <span className="badge badge-danger" style={{ padding: '0 6px' }}>{t.errorCount}</span>}
                     </span>
-                    <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-                      {groupBy !== 'status' && t.externalStatus && <span className="muted small ellipsis">{t.externalStatus}</span>}
-                      {groupBy !== 'assignee' && t.assignee && <Avatar name={t.assignee.name} size={20} />}
+                    <span className="row" style={{ gap: 6, flexWrap: 'nowrap', minWidth: 0 }}>
+                      {show('status') && groupBy !== 'status' && t.externalStatus && <span className="muted small ellipsis">{t.externalStatus}</span>}
+                      {show('assignee') && groupBy !== 'assignee' && t.assignee && <Avatar name={t.assignee.name} size={20} />}
                     </span>
                   </span>
+                  {(show('category') || show('page') || show('browser') || show('reporter') || show('received') || show('linked')) && (
+                    <span className="board-card-props">
+                      {show('category') && groupBy !== 'category' && t.category && <span className="prop">{t.category}</span>}
+                      {show('page') && t.pagePath && <span className="prop mono">{t.pagePath}</span>}
+                      {show('browser') && t.browser && <span className="prop">{t.browser}</span>}
+                      {show('reporter') && t.reporterEmail && <span className="prop">{t.reporterEmail}</span>}
+                      {show('linked') && <LinkedChip ticket={t} quiet />}
+                      {show('received') && <span className="prop muted">{timeAgo(t.createdAt)}</span>}
+                    </span>
+                  )}
                 </a>
               ))}
               {cards.length === 0 && <div className="lane-empty muted small">{droppable ? 'Drop here' : 'Nothing here'}</div>}
@@ -821,4 +925,12 @@ function EmptyState({ project, filtered }: { project: Project; filtered: boolean
       )}
     </div>
   );
+}
+
+/** A plain click opens the report beside the list; Cmd/Ctrl-click or a middle click still opens it as a page. */
+function openUnlessModified(e: MouseEvent, open: () => void) {
+  e.stopPropagation();
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  open();
 }
