@@ -12,7 +12,7 @@ export interface TourStep {
 /** The steps adapt to what the plan includes, so the tour never shows locked screens as if they worked. */
 export function tourSteps(me: Me): TourStep[] {
   const f = me.limits.features;
-  return [
+  const steps: TourStep[] = [
     {
       target: '[data-tour="nav-overview"]',
       title: 'Overview',
@@ -45,6 +45,8 @@ export function tourSteps(me: Me): TourStep[] {
       body: 'Guides for every integration, fixes for common problems, this tour again, and a direct line to our team.',
     },
   ];
+  // Members don't see Settings, and only the owner sees Plan & billing.
+  return steps.filter((s) => (s.target.includes('nav-settings') ? me.user.role !== 'member' : s.target.includes('nav-billing') ? me.user.role === 'owner' : true));
 }
 
 export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void }) {

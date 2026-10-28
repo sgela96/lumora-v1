@@ -11,6 +11,25 @@ function Icon({ size = 18, children }: { size?: number; children: ReactNode }) {
 type P = { size?: number };
 
 export const Icons = {
+  users: (p: P) => (
+    <Icon {...p}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2A6.5 6.5 0 0 1 21.5 20" />
+    </Icon>
+  ),
+  mail: (p: P) => (
+    <Icon {...p}>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="M4 7l8 6 8-6" />
+    </Icon>
+  ),
+  link: (p: P) => (
+    <Icon {...p}>
+      <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" />
+      <path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+    </Icon>
+  ),
   filter: (p: P) => (
     <Icon {...p}>
       <path d="M4 7h16M7 12h10M10 17h4" />

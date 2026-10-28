@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { ADDON_ORDER, ADDONS, isAddonId, isPlanId, PLAN_ORDER, PLANS, type AddonQuantities, type PlanId } from '@lumora/shared';
 import express, { Router } from 'express';
-import { requireJsonForMutations, requireUser } from '../auth';
+import { requireJsonForMutations, requireRole, requireUser } from '../auth';
 import { billingEnabled, config } from '../config';
 import { one, run } from '../db';
 import { planActivatedMail, sendMail } from '../lib/mail';
@@ -141,7 +141,7 @@ export function billingRouter(): Router {
   router.use(requireJsonForMutations, requireUser);
 
   /** Start (or change) a paid subscription: a plan plus add-ons. */
-  router.post('/checkout', async (req, res) => {
+  router.post('/checkout', requireRole('owner'), async (req, res) => {
     const plan = req.body.plan;
     if (!isPlanId(plan) || plan === 'free') throw new HttpError(400, 'Choose Pro or Business');
     if (!billingEnabled()) throw new HttpError(400, 'Billing is not configured on this server');
@@ -191,7 +191,7 @@ export function billingRouter(): Router {
     res.json({ url: session.url });
   });
 
-  router.post('/portal', async (req, res) => {
+  router.post('/portal', requireRole('owner'), async (req, res) => {
     if (!billingEnabled()) throw new HttpError(400, 'Billing is not configured on this server');
     const account = getAccount(req.user!.accountId);
     if (!account.stripe_customer_id) throw new HttpError(400, 'No subscription yet');
@@ -203,7 +203,7 @@ export function billingRouter(): Router {
   });
 
   /** Opt-in Pro trial: once per account, no card. When it ends the account is back on Free. */
-  router.post('/trial', (req, res) => {
+  router.post('/trial', requireRole('owner'), (req, res) => {
     const account = getAccount(req.user!.accountId);
     if (!canStartTrial(account)) throw new HttpError(409, account.trial_ends_at ? 'You’ve already used your Pro trial' : 'Your account is already on a paid plan');
     const ends = new Date(Date.now() + config.trialDays * 86400_000).toISOString();
@@ -212,7 +212,7 @@ export function billingRouter(): Router {
   });
 
   /** Without Stripe (local / self-hosted demo) plans and add-ons can be switched freely to try every tier. */
-  router.post('/dev-plan', (req, res) => {
+  router.post('/dev-plan', requireRole('owner'), (req, res) => {
     if (billingEnabled()) throw new HttpError(403, 'Use checkout when billing is enabled');
     const plan = req.body.plan;
     if (!isPlanId(plan)) throw new HttpError(400, 'Unknown plan');

@@ -492,7 +492,14 @@ test('dashboard: one layout per organization, set by the owner; Business metrics
   assert.equal(basic.level, 'basic');
   for (const key of ['byBrowser', 'byOs', 'byKind', 'topPages']) assert.ok(Array.isArray(basic[key]), key);
 
+  // Members don't touch settings or billing.
+  assert.equal((await call(`/api/projects/${project.id}`, { method: 'PATCH', body: { name: 'Nope' } })).status, 403);
+  assert.equal((await call(`/api/projects/${project.id}/integrations`)).status, 403);
+  assert.equal((await call('/api/billing/dev-plan', { body: { plan: 'business' } })).status, 403);
+
   // Business: people affected, workload, aging and the errors people saw.
+  cookie = '';
+  await call('/api/auth/login', { body: { email: 'owner@umbrella.test', password: 'password123' } });
   await call('/api/billing/dev-plan', { body: { plan: 'business' } });
   const error = { level: 'error', message: 'TypeError: x is undefined', timestamp: Date.now() };
   const seen = { level: 'error', message: 'Error shown on screen (Salesforce): “Insufficient access rights”', timestamp: Date.now() };
@@ -535,4 +542,67 @@ test('reports: filters take several values; the owner sets the default display f
   assert.deepEqual(display.properties, ['id', 'priority']);
   await call(`/api/projects/${project.id}/report-display`, { method: 'PUT', body: { display: null } });
   assert.equal((await call('/api/projects')).body[0].reportDisplay.layout, 'list');
+});
+
+test('organization: invitations use seats, invited people join with their role, owners and admins manage people', async () => {
+  cookie = '';
+  await call('/api/auth/register', { body: { name: 'Olivia Owner', company: 'Seatco', email: 'olivia@seatco.test', password: 'password123' } });
+  let org = (await call('/api/org')).body;
+  assert.equal(org.name, 'Seatco');
+  assert.deepEqual(org.seats, { used: 1, limit: 2 });
+  assert.equal(org.members[0].role, 'owner');
+  assert.equal((await call('/api/me')).body.user.role, 'owner');
+
+  // Free has 2 seats: the owner and one invitation.
+  const invite = await call('/api/org/invites', { body: { email: 'max@seatco.test', role: 'member' } });
+  assert.equal(invite.status, 201);
+  assert.match(invite.body.link, /\/app\/#\/invite\//);
+  assert.equal((await call('/api/org/invites', { body: { email: 'third@seatco.test' } })).status, 402);
+  assert.equal((await call('/api/org/invites', { body: { email: 'olivia@seatco.test' } })).status, 409);
+  // Re-inviting the same e-mail replaces the invitation instead of using another seat.
+  const again = await call('/api/org/invites', { body: { email: 'max@seatco.test', role: 'member' } });
+  assert.equal(again.status, 201);
+  assert.equal(again.body.organization.invites.length, 1);
+  assert.equal((await call(`/api/invites/${invite.body.link.split('/invite/')[1]}`)).status, 404, 'the old link stops working');
+
+  await call('/api/billing/dev-plan', { body: { plan: 'pro' } });
+  const adminInvite = await call('/api/org/invites', { body: { email: 'ada@seatco.test', role: 'admin' } });
+  assert.equal(adminInvite.status, 201);
+
+  // Accepting: anyone with the link, signed out.
+  cookie = '';
+  const token = again.body.link.split('/invite/')[1];
+  const preview = (await call(`/api/invites/${token}`)).body;
+  assert.deepEqual([preview.email, preview.organization, preview.invitedBy], ['max@seatco.test', 'Seatco', 'Olivia Owner']);
+  assert.equal((await call(`/api/invites/${token}/accept`, { body: { name: 'Max', password: 'short' } })).status, 400);
+  assert.equal((await call(`/api/invites/${token}/accept`, { body: { name: 'Max', password: 'password123' } })).status, 201);
+  const max = (await call('/api/me')).body;
+  assert.equal(max.user.role, 'member');
+  assert.equal(max.account.name, 'Seatco');
+  assert.equal(max.dashboard.canEdit, false);
+  assert.equal((await call(`/api/invites/${token}`)).status, 404, 'an invitation works once');
+  assert.equal((await call('/api/org/invites', { body: { email: 'x@seatco.test' } })).status, 403, 'members can’t invite');
+  const maxId = max.user.id;
+
+  cookie = '';
+  await call(`/api/invites/${adminInvite.body.link.split('/invite/')[1]}/accept`, { body: { name: 'Ada Admin', password: 'password123' } });
+  org = (await call('/api/org')).body;
+  assert.equal(org.you.role, 'admin');
+  // Admins change settings; billing stays with the owner.
+  const [seatProject] = (await call('/api/projects')).body;
+  assert.equal((await call(`/api/projects/${seatProject.id}`, { method: 'PATCH', body: { name: 'Seatco web' } })).status, 200);
+  assert.equal((await call('/api/billing/trial', { body: {} })).status, 403);
+  assert.deepEqual(org.members.map((m: { role: string }) => m.role), ['owner', 'admin', 'member']);
+  assert.equal((await call(`/api/org/members/${maxId}`, { method: 'PATCH', body: { role: 'admin' } })).status, 403, 'only the owner changes roles');
+  const ownerId = org.members[0].id;
+  assert.equal((await call(`/api/org/members/${ownerId}`, { method: 'DELETE', body: {} })).status, 400);
+  assert.equal((await call(`/api/org/members/${maxId}`, { method: 'DELETE', body: {} })).status, 200);
+  assert.deepEqual((await call('/api/org')).body.seats, { used: 2, limit: 5 });
+
+  // The owner hands over ownership and becomes an admin.
+  cookie = '';
+  await call('/api/auth/login', { body: { email: 'olivia@seatco.test', password: 'password123' } });
+  const adaId = org.members[1].id;
+  org = (await call(`/api/org/members/${adaId}`, { method: 'PATCH', body: { role: 'owner' } })).body;
+  assert.deepEqual(org.members.map((m: { name: string; role: string }) => `${m.name}:${m.role}`), ['Ada Admin:owner', 'Olivia Owner:admin']);
 });

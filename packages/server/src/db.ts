@@ -179,6 +179,23 @@ const MIGRATIONS: Migration[] = [
   /* sql */ `
   ALTER TABLE projects ADD COLUMN report_display TEXT;
   `,
+  // Organizations: roles, last activity and invitations.
+  /* sql */ `
+  ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member';
+  ALTER TABLE users ADD COLUMN last_seen_at TEXT;
+  UPDATE users SET role = 'owner' WHERE rowid IN (SELECT MIN(rowid) FROM users GROUP BY account_id);
+  CREATE TABLE invites (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    email TEXT NOT NULL COLLATE NOCASE,
+    role TEXT NOT NULL DEFAULT 'member',
+    token_hash TEXT NOT NULL UNIQUE,
+    invited_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT NOT NULL,
+    UNIQUE (account_id, email)
+  );
+  `,
 ];
 
 export function getDb(): DatabaseSync {
